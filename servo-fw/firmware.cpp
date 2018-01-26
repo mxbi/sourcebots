@@ -1,4 +1,5 @@
 #include <Adafruit_PWMServoDriver.h>
+#include "rotaryencoder.h"
 
 // Multiplying by this converts round-trip duration in microseconds to distance to object in millimetres.
 static const float ULTRASOUND_COEFFICIENT = 1e-6 * 343.0 * 0.5 * 1e3;
@@ -9,8 +10,6 @@ static const unsigned int UINT_MAX = (unsigned int) -1;
 static const String FIRMWARE_VERSION = "SourceBots PWM/GPIO v0.0.1";
 
 typedef String CommandError;
-
-static const CommandError OK = "";
 
 #define COMMAND_ERROR(x) ((x))
 
@@ -46,8 +45,6 @@ CommandHandler::CommandHandler(String cmd, CommandError (*runner)(int, String), 
 {
 }
 
-static void serialWrite(int commandId, char lineType, const String& str);
-
 static String pop_option(String& argument) {
   int separatorIndex = argument.indexOf(' ');
   if (separatorIndex == -1) {
@@ -61,7 +58,11 @@ static String pop_option(String& argument) {
   }
 }
 
-static CommandError run_help(int commandId, String argument);
+//static CommandError test_func(int commandId, String argument) {
+//  String arg1 = pop_option(argument);
+//  serialWrite(commandId, '>', arg1);
+//  return OK;
+//}
 
 static CommandError led(int commandId, String argument) {
   if (argument == "on") {
@@ -212,6 +213,7 @@ static const CommandHandler commands[] = {
   CommandHandler("gpio-read", &read_pin, "get digital input from GPIO pin"),
   CommandHandler("analogue-read", &analogue_read, "get all analogue inputs"),
   CommandHandler("ultrasound-read", &ultrasound_read, "read an ultrasound sensor <trigger-pin> <echo-pin>"),
+//  CommandHandler("test", &count_rotary_encoder, "please work"),
 };
 
 static void serialWrite(int commandId, char lineType, const String& str) {
