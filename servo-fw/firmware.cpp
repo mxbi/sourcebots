@@ -58,11 +58,13 @@ static String pop_option(String& argument) {
   }
 }
 
-//static CommandError test_func(int commandId, String argument) {
-//  String arg1 = pop_option(argument);
-//  serialWrite(commandId, '>', arg1);
-//  return OK;
-//}
+static CommandError run_help(int commandId, String argument);
+
+static CommandError test_func(int commandId, String argument) {
+ String arg1 = pop_option(argument);
+ serialWrite(commandId, '>', arg1);
+ return OK;
+}
 
 static CommandError led(int commandId, String argument) {
   if (argument == "on") {
