@@ -63,6 +63,8 @@ static CommandError run_help(int commandId, String argument);
 static CommandError test_func(int commandId, String argument) {
  String arg1 = pop_option(argument);
  serialWrite(commandId, '>', arg1);
+ arg1 = pop_option(argument);
+ serialWrite(commandId, '>', arg1);
  return OK;
 }
 
@@ -215,7 +217,7 @@ static const CommandHandler commands[] = {
   CommandHandler("gpio-read", &read_pin, "get digital input from GPIO pin"),
   CommandHandler("analogue-read", &analogue_read, "get all analogue inputs"),
   CommandHandler("ultrasound-read", &ultrasound_read, "read an ultrasound sensor <trigger-pin> <echo-pin>"),
-//  CommandHandler("test", &count_rotary_encoder, "please work"),
+  CommandHandler("test", &test_func, "please work"),
 };
 
 static void serialWrite(int commandId, char lineType, const String& str) {
