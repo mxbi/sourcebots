@@ -270,6 +270,7 @@ static const CommandHandler commands[] = {
   CommandHandler("gpio-read", &read_pin, "get digital input from GPIO pin"),
   CommandHandler("analogue-read", &analogue_read, "get all analogue inputs"),
   CommandHandler("ur", &real_best_read_ultrasound, "read an ultrasound sensor <trigger-pin> <echo-pin>"),
+  CommandHandler("ultrasound_read", &ultrasound_read, "read an ultrasound sensor <trigger-pin> <echo-pin>")
   CommandHandler("test", &test_func, "please work"),
 };
 
