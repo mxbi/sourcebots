@@ -1,5 +1,6 @@
 #include <Adafruit_PWMServoDriver.h>
 #include "rotaryencoder.h"
+#include <algorithm>
 
 // Multiplying by this converts round-trip duration in microseconds to distance to object in millimetres.
 static const float ULTRASOUND_COEFFICIENT = 1e-6 * 343.0 * 0.5 * 1e3;
@@ -203,6 +204,58 @@ static CommandError ultrasound_read(int commandId, String argument) {
   return OK;
 }
 
+static float read_us(int triggerPin, int echoPin) {
+  // Reset trigger pin.
+  pinMode(triggerPin, OUTPUT);
+  digitalWrite(triggerPin, LOW);
+  delayMicroseconds(2);
+
+  // Pulse trigger pin.
+  digitalWrite(triggerPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(triggerPin, LOW);
+
+  // Set echo pin to input now (we don't do it earlier, since it's allowable
+  // for triggerPin and echoPin to be the same pin).
+  pinMode(echoPin, INPUT);
+
+  // Read return pulse.
+  float duration = (float) pulseIn(echoPin, HIGH);       // In microseconds.
+
+  return duration * ULTRASOUND_COEFFICIENT; // distance in millimetres
+}
+
+static CommandError real_best_read_ultrasound(int commandID, String argument) {
+  String triggerPinStr = pop_option(argument);
+  String echoPinStr = pop_option(argument);
+
+  if (argument.length() || !triggerPinStr.length() || !echoPinStr.length()) {
+    return COMMAND_ERROR("need exactly two arguments: <trigger-pin> <echo-pin>");
+  }
+
+  int triggerPin = triggerPinStr.toInt();
+  int echoPin = echoPinStr.toInt();
+
+  const int readings = 3; // Must be odd for median
+  float distances[readings] = { 0.0 };
+
+  for (int i=0; i<readings; i++) {
+  	float value = read_us(triggerPin, echoPin);
+    distances[i] = value;
+  }
+
+  std::sort(distances, distances + readings);
+
+  float distance = distances[readings/2]
+
+  distance = constrain(distance, 0.0, (float) UINT_MAX); // Ensure that the next line won't overflow.
+  unsigned int distanceInt = (unsigned int) distance;
+
+  serialWrite(commandId, '>', String(distanceInt));
+
+  return OK;
+}
+
 static CommandError get_version(int commandId, String argument) {
   serialWrite(commandId, '>', FIRMWARE_VERSION);
   return OK;
@@ -216,7 +269,7 @@ static const CommandHandler commands[] = {
   CommandHandler("gpio-write", &write_pin, "set output from GPIO pin"),
   CommandHandler("gpio-read", &read_pin, "get digital input from GPIO pin"),
   CommandHandler("analogue-read", &analogue_read, "get all analogue inputs"),
-  CommandHandler("ultrasound-read", &ultrasound_read, "read an ultrasound sensor <trigger-pin> <echo-pin>"),
+  CommandHandler("ur", &real_best_read_ultrasound, "read an ultrasound sensor <trigger-pin> <echo-pin>"),
   CommandHandler("test", &test_func, "please work"),
 };
 
