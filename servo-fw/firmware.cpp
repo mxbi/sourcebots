@@ -1,5 +1,7 @@
+#include <ArduinoSTL.h>
 #include <Adafruit_PWMServoDriver.h>
-#include <algorithm>
+//#define ENCODER_OPTIMIZE_INTERRUPTS
+#include <Encoder.h>
 
 // Multiplying by this converts round-trip duration in microseconds to distance to object in millimetres.
 static const float ULTRASOUND_COEFFICIENT = 1e-6 * 343.0 * 0.5 * 1e3;
@@ -10,10 +12,17 @@ static const unsigned int UINT_MAX = (unsigned int) -1;
 static const String FIRMWARE_VERSION = "SourceBots PWM/GPIO v0.0.1";
 
 typedef String CommandError;
-
+static const CommandError OK = "";
 #define COMMAND_ERROR(x) ((x))
 
 static Adafruit_PWMServoDriver SERVOS = Adafruit_PWMServoDriver();
+
+static String pop_option(String& argument);
+static void serialWrite(int commandId, char lineType, const String& str);
+
+// Define rotary encoders
+Encoder encoderLeft(2, 4);
+Encoder encoderRight(3, 5);
 
 void setup() {
   // put your setup code here, to run once:
@@ -59,14 +68,6 @@ static String pop_option(String& argument) {
 }
 
 static CommandError run_help(int commandId, String argument);
-
-static CommandError test_func(int commandId, String argument) {
- String arg1 = pop_option(argument);
- serialWrite(commandId, '>', arg1);
- arg1 = pop_option(argument);
- serialWrite(commandId, '>', arg1);
- return OK;
-}
 
 static CommandError led(int commandId, String argument) {
   if (argument == "on") {
@@ -203,6 +204,8 @@ static CommandError ultrasound_read(int commandId, String argument) {
   return OK;
 }
 
+/////////////////// CUSTOM FUNCTIONS ////////////////////
+
 static float read_us(int triggerPin, int echoPin) {
   // Reset trigger pin.
   pinMode(triggerPin, OUTPUT);
@@ -224,13 +227,8 @@ static float read_us(int triggerPin, int echoPin) {
   return duration * ULTRASOUND_COEFFICIENT; // distance in millimetres
 }
 
-static CommandError get_version(int commandId, String argument) {
-  serialWrite(commandId, '>', FIRMWARE_VERSION);
-  return OK;
-}
-
 // Read three times on arduino and return median
-static CommandError fast_read_ultrasound(int commandID, String argument) {
+static CommandError fast_read_ultrasound(int commandId, String argument) {
   String triggerPinStr = pop_option(argument);
   String echoPinStr = pop_option(argument);
 
@@ -251,13 +249,30 @@ static CommandError fast_read_ultrasound(int commandID, String argument) {
 
   std::sort(distances, distances + readings);
 
-  float distance = distances[readings/2]
+  float distance = distances[readings/2];
 
   distance = constrain(distance, 0.0, (float) UINT_MAX); // Ensure that the next line won't overflow.
   unsigned int distanceInt = (unsigned int) distance;
 
   serialWrite(commandId, '>', String(distanceInt));
 
+  return OK;
+}
+
+static CommandError read_rotary_encoders(int commandId, String argument) {
+  long leftCount, rightCount;
+  leftCount = encoderLeft.read();
+  rightCount = encoderRight.read();
+
+  serialWrite(commandId, '>', String(leftCount));
+  serialWrite(commandId, '>', String(rightCount));
+  return OK;
+}
+
+///////////////////// END CUSTOM FUNCTIONS ////////////////////////
+
+static CommandError get_version(int commandId, String argument) {
+  serialWrite(commandId, '>', FIRMWARE_VERSION);
   return OK;
 }
 
@@ -270,8 +285,8 @@ static const CommandHandler commands[] = {
   CommandHandler("gpio-read", &read_pin, "get digital input from GPIO pin"),
   CommandHandler("analogue-read", &analogue_read, "get all analogue inputs"),
   CommandHandler("u", &fast_read_ultrasound, "read an ultrasound sensor <trigger-pin> <echo-pin>"),
-  CommandHandler("ultrasound_read", &ultrasound_read, "read an ultrasound sensor <trigger-pin> <echo-pin>")
-  CommandHandler("test", &test_func, "please work"),
+  CommandHandler("ultrasound_read", &ultrasound_read, "read an ultrasound sensor <trigger-pin> <echo-pin>"),
+  CommandHandler("r", &read_rotary_encoders, "read both rotary encoder counts, no arguments"),
 };
 
 static void serialWrite(int commandId, char lineType, const String& str) {
