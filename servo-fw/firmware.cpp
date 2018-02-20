@@ -1,5 +1,4 @@
 #include <Adafruit_PWMServoDriver.h>
-#include "rotaryencoder.h"
 #include <algorithm>
 
 // Multiplying by this converts round-trip duration in microseconds to distance to object in millimetres.
@@ -225,7 +224,13 @@ static float read_us(int triggerPin, int echoPin) {
   return duration * ULTRASOUND_COEFFICIENT; // distance in millimetres
 }
 
-static CommandError real_best_read_ultrasound(int commandID, String argument) {
+static CommandError get_version(int commandId, String argument) {
+  serialWrite(commandId, '>', FIRMWARE_VERSION);
+  return OK;
+}
+
+// Read three times on arduino and return median
+static CommandError fast_read_ultrasound(int commandID, String argument) {
   String triggerPinStr = pop_option(argument);
   String echoPinStr = pop_option(argument);
 
@@ -256,11 +261,6 @@ static CommandError real_best_read_ultrasound(int commandID, String argument) {
   return OK;
 }
 
-static CommandError get_version(int commandId, String argument) {
-  serialWrite(commandId, '>', FIRMWARE_VERSION);
-  return OK;
-}
-
 static const CommandHandler commands[] = {
   CommandHandler("help", &run_help, "show information"),
   CommandHandler("led", &led, "control the debug LED (on/off)"),
@@ -269,7 +269,7 @@ static const CommandHandler commands[] = {
   CommandHandler("gpio-write", &write_pin, "set output from GPIO pin"),
   CommandHandler("gpio-read", &read_pin, "get digital input from GPIO pin"),
   CommandHandler("analogue-read", &analogue_read, "get all analogue inputs"),
-  CommandHandler("u", &real_best_read_ultrasound, "read an ultrasound sensor <trigger-pin> <echo-pin>"),
+  CommandHandler("u", &fast_read_ultrasound, "read an ultrasound sensor <trigger-pin> <echo-pin>"),
   CommandHandler("ultrasound_read", &ultrasound_read, "read an ultrasound sensor <trigger-pin> <echo-pin>")
   CommandHandler("test", &test_func, "please work"),
 };
