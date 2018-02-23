@@ -1,6 +1,8 @@
 import numpy as np
 import time
-import copy
+import contextlib
+import sys
+import os
 
 # Define units
 ms = 0.001
@@ -8,13 +10,25 @@ ms = 0.001
 # Define constants
 RE_PER_CM = 11.13       # Rotary encodes per cm moved - ~1% error
 RE_LATENCY = 60 * ms # Rotary encoder function lag in milliseconds - currently pulled out of my ass
-RE_PREDICT_TIME = 100 * ms # Stop checking rotary encoder and use the current velocity to predict when this many seconds remain
+RE_PREDICT_TIME = 200 * ms # Stop checking rotary encoder and use the current velocity to predict when this many seconds remain
+RE_MOVE_OFFSET = 8 # Breaking distance to always subtract in cm
 
 FAST_MOVE_SPEED = 1
 
-def wait_until(time):
-    "Wait until `time` in unix epoch time"
-    time.sleep(time.time() - time)
+# Use 'with nostdout():' to silence output.
+@contextlib.contextmanager
+def nostdout():
+    with open(os.devnull, "w") as devnull:
+        old_stdout = sys.stdout
+        sys.stdout = devnull
+        try:
+            yield
+        finally:
+            sys.stdout = old_stdout
+
+def wait_until(t):
+    "Wait until `t` in unix epoch time"
+    time.sleep(max(0, t - time.time()))
 
 class RobotController:
     def __init__(self, robot):
@@ -22,26 +36,32 @@ class RobotController:
         self.mleft = self.r.motor_board.m0
         self.mright = self.r.motor_board.m1
 
-        self.arduino = self.servo_board
+        self.arduino = self.r.servo_board
 
         self._update_re()
 
     def _update_re(self):
-        self.left_re, self.right_re = self.arduino.direct_command('r')
+        t0 = time.time()
+        with nostdout():
+            self.left_re, self.right_re = [int(i) for i in self.arduino.direct_command('r')]
         self.re = np.array([self.left_re, self.right_re])
         self.re_time = time.time() - RE_LATENCY # Estimate actual time measurement was taken
 
     @property
     def speed(self):
-        return [self.mleft, self.mright]
+        return (self.mleft, self.mright)
 
     @speed.setter # Dark magic, when "self.speed = 1" is called, update both motors
     def speed(self, speed):
-        self.mleft, self.mright = speed
+        print('setting speed')
+        print(speed)
+        self.r.motor_board.m0, self.r.motor_board.m1 = speed, speed
 
     def move(self, distance, movement_speed=FAST_MOVE_SPEED):
         "Accurately move `distance` cm using rotary encoders. Can be negative"
         # TODO: Actively correct for drift during movement
+        distance -= RE_MOVE_OFFSET
+        distances = []
         self._update_re()
         initial_re = self.re.copy()
         initial_time = self.re_time
@@ -60,17 +80,20 @@ class RobotController:
 
             # Note this is a vector because re/old_re is a vector
             total_distance = (self.re - initial_re) / RE_PER_CM
+            distances.append(total_distance)
 
-            re_time_delta = self.last_re_time - old_re_time
+            re_time_delta = self.re_time - old_re_time
             velocity = (self.re - old_re) / RE_PER_CM / re_time_delta
 
             # TODO: How to deal with vectors? Right now I just work based on the left rotary encoder
             time_remaining = (distance - total_distance[0]) / velocity[0]
             # Because "re_time" is corrected for the latency of the re function, this pseudo-works out the time when the movement should actually finish,
             # not when the rotary encoder says the movement should finish (which would be 60ms or so off)
+            if time_remaining < 0:
+                time_remaining = 5
             end_time = self.re_time + time_remaining
 
-            print('[RobotController] Distance travelled {}cm Velocity {}cm/s Time remaining {}s'.format(total_distance, velocity, time_remaining))
+            print('[RobotController] Distance {}cm Velocity {}cm/s ETA {}s'.format(total_distance, velocity, round(time_remaining, 4)))
 
             if time_remaining < RE_PREDICT_TIME:
                 break
@@ -78,8 +101,15 @@ class RobotController:
         wait_until(end_time)
         self.speed = 0
 
-        self._update_re()
+        t0 = time.time()
 
-        print('[RobotController] Finished - travelled {}cm'.format(self.re))
+        # Temporary
+        # TODO: Exit when it actually stops moving (when velocity goes to 0)
+        for i in range(10):
+            self._update_re()
+            total_distance = (self.re - initial_re) / RE_PER_CM
+            distances.append(total_distance)
+            print(time.time() - t0)
+            print('[RobotController] Finished - travelled {}cm'.format((self.re - initial_re) / RE_PER_CM))
 
-        return self.re
+        return distances
