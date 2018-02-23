@@ -13,7 +13,7 @@ RE_LATENCY = 60 * ms  # Rotary encoder function lag in milliseconds - currently 
 RE_PREDICT_TIME = 200 * ms  # Stop checking rotary encoder and use the current velocity to predict when this many seconds remain
 RE_MOVE_OFFSET = 8  # Breaking distance to always subtract in cm
 RE_PER_DEGREE = 8.02  # The difference in rotary encoder readings necessary to turn a degree. TODO: Find better value
-RE_ROTATE_OFFSET = 3
+RE_ROTATE_OFFSET = 3  # The amount, in degrees, by which the robot tends to overshoot
 
 FAST_MOVE_SPEED = 1
 FAST_ROTATE_SPEED = 0.5
@@ -93,18 +93,17 @@ class RobotController:
 		return np.sin(v * (np.pi / 180))
 
 	def move(self, distance, speed=FAST_MOVE_SPEED):
+		sign = np.sign(distance)
+
 		"Accurately move `distance` cm using rotary encoders. Can be negative"
 		# TODO: Actively correct for drift during movement
-		distance -= RE_MOVE_OFFSET  # TODO: Salv
+		distance -= RE_MOVE_OFFSET * sign
 		distances = []
 		self._update_re()
 		initial_re = self.re.copy()
 		initial_time = self.re_time
 
-		if distance > 0:
-			self.speed = speed
-		else:
-			self.speed = -speed
+		self.speed = speed * sign
 
 		vs = []
 		while True:
@@ -122,22 +121,22 @@ class RobotController:
 			velocity = (self.re - old_re) / RE_PER_CM / re_time_delta
 
 			alpha = 0.05
-			v = speed - alpha * np.maximum(0, total_distance - total_distance[::-1])
+			# The 'sign' factor is there so that instead of speeding up the slower wheel,
+			# the faster wheel will slow down when distance < 0
+			v = speed - sign * alpha * np.maximum(0, sign * (total_distance - total_distance[::-1]))
 			print(v)
 			vs.append(v)
 			self.mleft = v[0]
 			self.mright = v[1]
 
 			time_remaining = (distance - total_distance.mean()) / velocity.mean()
-			# Because "re_time" is corrected for the latency of the re function, this pseudo-works out the time when the movement should actually finish,
-			# not when the rotary encoder says the movement should finish (which would be 60ms or so off)
-			if time_remaining < 0:
-				time_remaining = 5
-			end_time = self.re_time + time_remaining
 
 			print('[RobotController] Distance {}cm Velocity {}cm/s ETA {}s'.format(total_distance, velocity, round(time_remaining, 4)))
 
-			if time_remaining < RE_PREDICT_TIME:
+			# Because "re_time" is corrected for the latency of the re function, this pseudo-works out the time when the movement should actually finish,
+			# not when the rotary encoder says the movement should finish (which would be 60ms or so off)
+			if RE_PREDICT_TIME > time_remaining >= 0:
+				end_time = self.re_time + time_remaining
 				break
 
 		wait_until(end_time)
@@ -162,17 +161,16 @@ class RobotController:
 
 	# Turns the angle in degrees, where clockwise is positive and anticlockwise is negative
 	def rotate(self, angle, speed=FAST_ROTATE_SPEED):
-		angle -= RE_ROTATE_OFFSET
+		sign = np.sign(angle)  # -1 if negative, 1 if positive, 0 if 0
+
+		angle -= RE_ROTATE_OFFSET * sign
 		angles = []
 		self._update_re()
 		initial_re = self.re.copy()
 		initial_time = self.re_time
 
-		if angle < 0:
-			speed = -speed
-
-		self.mleft = speed
-		self.mright = -speed
+		self.mleft = speed * sign
+		self.mright = -speed * sign
 
 		while True:
 			# Save last rotary encoder values for comparison
@@ -186,17 +184,15 @@ class RobotController:
 			angles.append(angle_travelled)
 
 			re_time_delta = self.re_time - old_re_time
+			# Angular velocity in degrees per second
 			velocity = self._aminusb(self.re - old_re) / RE_PER_DEGREE / re_time_delta
 
 			time_remaining = (angle - angle_travelled) / velocity
 
-			if time_remaining < 0:  # TODO: Something that isn't an ugly hack
-				time_remaining = 5
-			end_time = self.re_time + time_remaining
-
 			print('[RobotController] Rotation {}deg Velocity {}deg/s ETA {}s'.format(angle_travelled, velocity, round(time_remaining, 4)))
 
-			if time_remaining < RE_PREDICT_TIME:
+			if RE_PREDICT_TIME > time_remaining >= 0:
+				end_time = self.re_time + time_remaining
 				break
 
 		wait_until(end_time)
