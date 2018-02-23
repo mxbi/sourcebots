@@ -1,4 +1,4 @@
-#include <ArduinoSTL.h>
+//#include <ArduinoSTL.h>
 #include <Adafruit_PWMServoDriver.h>
 //#define ENCODER_OPTIMIZE_INTERRUPTS
 #include <Encoder.h>
@@ -247,9 +247,11 @@ static CommandError fast_read_ultrasound(int commandId, String argument) {
     distances[i] = value;
   }
 
-  std::sort(distances, distances + readings);
+//  std::sort(distances, distances + readings);
+  
 
-  float distance = distances[readings/2];
+//  float distance = distances[readings/2];
+  float distance = distances[0]; //lol
 
   distance = constrain(distance, 0.0, (float) UINT_MAX); // Ensure that the next line won't overflow.
   unsigned int distanceInt = (unsigned int) distance;
