@@ -24,6 +24,9 @@ static void serialWrite(int commandId, char lineType, const String& str);
 Encoder encoderLeft(2, 4);
 Encoder encoderRight(3, 5);
 
+// Switch var
+static bool switchPressed = false;
+
 void setup() {
   // put your setup code here, to run once:
   pinMode(LED_BUILTIN, OUTPUT);
@@ -243,7 +246,7 @@ static CommandError fast_read_ultrasound(int commandId, String argument) {
   float distances[readings] = { 0.0 };
 
   for (int i=0; i<readings; i++) {
-  	float value = read_us(triggerPin, echoPin);
+    float value = read_us(triggerPin, echoPin);
     distances[i] = value;
   }
 
@@ -271,6 +274,12 @@ static CommandError read_rotary_encoders(int commandId, String argument) {
   return OK;
 }
 
+static bool isSwitchPressed() {
+  int old = switchPressed;
+  switchPressed = false;
+  return old;
+}
+
 ///////////////////// END CUSTOM FUNCTIONS ////////////////////////
 
 static CommandError get_version(int commandId, String argument) {
@@ -289,6 +298,7 @@ static const CommandHandler commands[] = {
   CommandHandler("u", &fast_read_ultrasound, "read an ultrasound sensor <trigger-pin> <echo-pin>"),
   CommandHandler("ultrasound_read", &ultrasound_read, "read an ultrasound sensor <trigger-pin> <echo-pin>"),
   CommandHandler("r", &read_rotary_encoders, "read both rotary encoder counts, no arguments"),
+  CommandHandler("s", &isSwitchPressed, "find out if switch has been pressed"),
 };
 
 static void serialWrite(int commandId, char lineType, const String& str) {
@@ -411,7 +421,7 @@ static void process_serial() {
 
   if (serialInput == ' ' && skipWS) {
     return; // ignore junk whitespace
-  } else {
+  } else {m
     skipWS = (serialInput == ' '); // ignore any successive whitespace
   }
 
@@ -421,5 +431,8 @@ static void process_serial() {
 void loop() {
   while (Serial.available()) {
     process_serial();
+    if (digitalRead(6) == HIGH) {
+      switchPressed = true;
+    }
   }
 }
