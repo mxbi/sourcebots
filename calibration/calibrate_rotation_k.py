@@ -12,6 +12,8 @@ r = robot.Robot()
 motion = lib.MotionController(r)
 
 all_k = []
+all_re = []
+all_v = []
 for power in test_cases:
 	print('## Testing at power {}'.format(power))
 
@@ -46,4 +48,7 @@ for power in test_cases:
 		K = re_delta / velocity
 		print('Velocity = {} K = {}'.format(power * multiplier, K))
 
-print('Finished! Found K = {} std.dev = {}'.format(np.mean(all_k), np.std(all_k)))
+# mean
+K = np.mean(all_re / all_k)
+mae = np.mean(np.abs(K - np.array(all_k)))
+print('Finished! Found K = {} MAE = {}'.format(K, mae))

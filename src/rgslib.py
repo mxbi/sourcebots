@@ -38,7 +38,6 @@ def wait_until(t):
 	"Wait until `t` in unix epoch time"
 	time.sleep(max(0, t - time.time()))
 
-
 class MotionController:
 	def __init__(self, robot):
 		self.r = robot
@@ -109,6 +108,7 @@ class MotionController:
 		self._update_re()
 		initial_re = self.re.copy()
 		initial_time = self.re_time
+		velocity = None
 
 		try:
 			self.speed = speed * sign
@@ -126,7 +126,13 @@ class MotionController:
 				distances.append(total_distance)
 
 				re_time_delta = self.re_time - old_re_time
-				velocity = (self.re - old_re) / RE_PER_CM / re_time_delta
+
+				# Update the velocity with some weight to get a smoother more accurate measurement
+				# Instead of resetting the velocity every time
+				v = (self.re - old_re) / RE_PER_CM / re_time_delta
+				if velocity is None:
+					velocity = v
+				velocity = VELOCITY_UPDATE_ALPHA * v + (1 - VELOCITY_UPDATE_ALPHA) * velocity
 
 				alpha = 0.05
 				# The 'sign' factor is there so that instead of speeding up the slower wheel,
@@ -179,6 +185,7 @@ class MotionController:
 		self._update_re()
 		initial_re = self.re.copy()
 		initial_time = self.re_time
+		velocity = None
 
 		try:
 			self.mleft = speed * sign
@@ -197,7 +204,10 @@ class MotionController:
 
 				re_time_delta = self.re_time - old_re_time
 				# Angular velocity in degrees per second
-				velocity = self._aminusb(self.re - old_re) / RE_PER_DEGREE / re_time_delta
+				v = self._aminusb(self.re - old_re) / RE_PER_DEGREE / re_time_delta
+				if velocity is None:
+					velocity = v
+				velocity = VELOCITY_UPDATE_ALPHA * v + (1 - VELOCITY_UPDATE_ALPHA) * velocity
 
 				time_remaining = (angle - angle_travelled) / velocity
 
