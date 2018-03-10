@@ -20,6 +20,7 @@ RE_ROTATE_OFFSET = 3  # The amount, in degrees, by which the robot tends to over
 FAST_MOVE_SPEED = 1
 FAST_ROTATE_SPEED = 0.5
 
+VELOCITY_UPDATE_ALPHA = 0.5 # Update rate for velocity (v1 = alpha * d(RE)/dt + (1 -alpha) * v0)
 
 # Use 'with nostdout():' to silence output.
 @contextlib.contextmanager
@@ -50,16 +51,17 @@ class MotionController:
 	def __del__(self, robot):
 		self.speed = 0
 
-	def _update_re(self):
+	# Update the rotary encoder time
+	def update_re(self):
 		t0 = time.time()
-		# print(t0)
 		with nostdout():
-			# if 1:
 			self.left_re, self.right_re = [int(i) for i in self.arduino.direct_command('r')]
 		self.re = np.array([self.left_re, self.right_re])
-		# print(self.re)
-		# print(id(self.re))
 		self.re_time = time.time() - RE_LATENCY  # Estimate actual time measurement was taken
+
+	# Backwards-compatibility
+	def _update_re(self):
+		self.update_re()
 
 	@property
 	def mleft(self):
