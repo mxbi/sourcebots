@@ -1,3 +1,5 @@
+import threading
+
 import numpy as np
 import time
 import contextlib
@@ -36,7 +38,7 @@ def wait_until(t):
 	time.sleep(max(0, t - time.time()))
 
 
-class RobotController:
+class MovementController:
 	def __init__(self, robot):
 		self.r = robot
 		self.arduino = self.r.servo_board
@@ -92,11 +94,10 @@ class RobotController:
 	def sin(self, v):
 		return np.sin(v * (np.pi / 180))
 
-	def move(self, distance, speed=FAST_MOVE_SPEED):
-		sign = np.sign(distance)
+	def move(self, distance, speed=FAST_MOVE_SPEED, interrupts=[]):
+		"""Accurately move `distance` cm using rotary encoders. Can be negative"""
 
-		"Accurately move `distance` cm using rotary encoders. Can be negative"
-		# TODO: Actively correct for drift during movement
+		sign = np.sign(distance)
 		distance -= RE_MOVE_OFFSET * sign
 		distances = []
 		self._update_re()
@@ -200,7 +201,7 @@ class RobotController:
 
 		# Temporary
 		# TODO: Exit when it actually stops moving (when velocity goes to 0)
-		for i in range(10):
+		for i in range(1):
 			t0 = time.time()
 			self._update_re()
 			# total_distance = (self.re - initial_re) / RE_PER_CM
@@ -211,3 +212,42 @@ class RobotController:
 		self.rot += self._aminusb(self.re - initial_re) / RE_PER_DEGREE
 
 		return angles
+
+
+class VisionController:
+	# Gets passed the Robot() instance so it can use the cameras
+	def __init__(self, robot):
+		self.r = robot
+		self.camera = robot.camera
+
+		# Can't see any markers initially
+		self.markers = []
+
+		# The number of times the markers have been updated my the marker thread.
+		# Useful for blocking
+		self.marker_update_count = 0
+
+		# Start thread which runs forever
+		MarkerThread(self).start()
+
+	def markers_blocking(self):
+		old_marker_count = self.marker_update_count
+		# Wait for markers to be updated twice since calling the function
+
+		while self.marker_update_count < old_marker_count + 2:
+			pass
+		return self.markers
+
+
+# Thread which continuously updates the vision controller's 'markers' field with the latest reading of markers
+class MarkerThread(threading.Thread):
+	def __init__(self, vision_controller):
+		self.vision_controller = vision_controller
+		threading.Thread.__init__(self)
+
+	def run(self):
+		vision_controller = self.vision_controller
+		camera = vision_controller.camera
+		while True:
+			vision_controller.markers = camera.see()
+			vision_controller.marker_update_count += 1
