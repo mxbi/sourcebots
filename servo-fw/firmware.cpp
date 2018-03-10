@@ -242,7 +242,7 @@ static void quickSort(float arr[], int left, int right) {
 
 static float getMedian(float arr[], int n) {
   quickSort(arr, 0, n);
-  return arr[n/2]
+  return arr[n/2];
 }
 
 static float read_us(int triggerPin, int echoPin) {
@@ -286,7 +286,7 @@ static CommandError fast_read_ultrasound(int commandId, String argument) {
     distances[i] = value;
   }
 
-  float distance = getMedian(distances, readings)
+  float distance = getMedian(distances, readings);
 
   distance = constrain(distance, 0.0, (float) UINT_MAX); // Ensure that the next line won't overflow.
   unsigned int distanceInt = (unsigned int) distance;
@@ -330,7 +330,7 @@ static const CommandHandler commands[] = {
   CommandHandler("u", &fast_read_ultrasound, "read an ultrasound sensor <trigger-pin> <echo-pin>"),
   CommandHandler("ultrasound_read", &ultrasound_read, "read an ultrasound sensor <trigger-pin> <echo-pin>"),
   CommandHandler("r", &read_rotary_encoders, "read both rotary encoder counts, no arguments"),
-  CommandHandler("s", &is_switch_pressed, "find out if switch has been pressed"),
+  CommandHandler("send_help", &is_switch_pressed, "find out if switch has been pressed"), // do not work; switch, ms, sh, m, p, s
 };
 
 static void serialWrite(int commandId, char lineType, const String& str) {
