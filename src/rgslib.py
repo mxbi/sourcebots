@@ -38,13 +38,17 @@ def wait_until(t):
 	time.sleep(max(0, t - time.time()))
 
 
-class MovementController:
+class MotionController:
 	def __init__(self, robot):
 		self.r = robot
 		self.arduino = self.r.servo_board
 
 		self.reset_state()
 		self._update_re()
+
+	# On destruction, set speed to 0
+	def __del__(self, robot):
+		self.speed = 0
 
 	def _update_re(self):
 		t0 = time.time()
@@ -104,44 +108,48 @@ class MovementController:
 		initial_re = self.re.copy()
 		initial_time = self.re_time
 
-		self.speed = speed * sign
+		try:
+			self.speed = speed * sign
 
-		vs = []
-		while True:
-			# Save last rotary encoder values for comparison
-			old_re = self.re.copy()
-			old_re_time = self.re_time
+			vs = []
+			while True:
+				# Save last rotary encoder values for comparison
+				old_re = self.re.copy()
+				old_re_time = self.re_time
 
-			self._update_re()
+				self._update_re()
 
-			# Note this is a vector because re/old_re is a vector
-			total_distance = (self.re - initial_re) / RE_PER_CM
-			distances.append(total_distance)
+				# Note this is a vector because re/old_re is a vector
+				total_distance = (self.re - initial_re) / RE_PER_CM
+				distances.append(total_distance)
 
-			re_time_delta = self.re_time - old_re_time
-			velocity = (self.re - old_re) / RE_PER_CM / re_time_delta
+				re_time_delta = self.re_time - old_re_time
+				velocity = (self.re - old_re) / RE_PER_CM / re_time_delta
 
-			alpha = 0.05
-			# The 'sign' factor is there so that instead of speeding up the slower wheel,
-			# the faster wheel will slow down when distance < 0
-			v = speed - sign * alpha * np.maximum(0, sign * (total_distance - total_distance[::-1]))
-			print(v)
-			vs.append(v)
-			self.mleft = v[0]
-			self.mright = v[1]
+				alpha = 0.05
+				# The 'sign' factor is there so that instead of speeding up the slower wheel,
+				# the faster wheel will slow down when distance < 0
+				v = speed - sign * alpha * np.maximum(0, sign * (total_distance - total_distance[::-1]))
+				print(v)
+				vs.append(v)
+				self.mleft = v[0]
+				self.mright = v[1]
 
-			time_remaining = (distance - total_distance.mean()) / velocity.mean()
+				time_remaining = (distance - total_distance.mean()) / velocity.mean()
 
-			print('[RobotController] Distance {}cm Velocity {}cm/s ETA {}s'.format(total_distance, velocity, round(time_remaining, 4)))
+				print('[RobotController] Distance {}cm Velocity {}cm/s ETA {}s'.format(total_distance, velocity, round(time_remaining, 4)))
 
-			# Because "re_time" is corrected for the latency of the re function, this pseudo-works out the time when the movement should actually finish,
-			# not when the rotary encoder says the movement should finish (which would be 60ms or so off)
-			if RE_PREDICT_TIME > time_remaining >= 0:
-				end_time = self.re_time + time_remaining
-				break
+				# Because "re_time" is corrected for the latency of the re function, this pseudo-works out the time when the movement should actually finish,
+				# not when the rotary encoder says the movement should finish (which would be 60ms or so off)
+				if RE_PREDICT_TIME > time_remaining >= 0:
+					end_time = self.re_time + time_remaining
+					break
 
-		wait_until(end_time)
-		self.speed = 0
+			wait_until(end_time)
+			self.speed = 0
+		except:
+			self.speed = 0 # If something crashes here, turn off the motors so it doesn't attack the wall
+			raise
 
 		t0 = time.time()
 
@@ -170,34 +178,38 @@ class MovementController:
 		initial_re = self.re.copy()
 		initial_time = self.re_time
 
-		self.mleft = speed * sign
-		self.mright = -speed * sign
+		try:
+			self.mleft = speed * sign
+			self.mright = -speed * sign
 
-		while True:
-			# Save last rotary encoder values for comparison
-			old_re = self.re.copy()
-			old_re_time = self.re_time
+			while True:
+				# Save last rotary encoder values for comparison
+				old_re = self.re.copy()
+				old_re_time = self.re_time
 
-			self._update_re()
+				self._update_re()
 
-			# Note this is a vector because re/old_re is a vector
-			angle_travelled = self._aminusb(self.re - initial_re) / RE_PER_DEGREE
-			angles.append(angle_travelled)
+				# Note this is a vector because re/old_re is a vector
+				angle_travelled = self._aminusb(self.re - initial_re) / RE_PER_DEGREE
+				angles.append(angle_travelled)
 
-			re_time_delta = self.re_time - old_re_time
-			# Angular velocity in degrees per second
-			velocity = self._aminusb(self.re - old_re) / RE_PER_DEGREE / re_time_delta
+				re_time_delta = self.re_time - old_re_time
+				# Angular velocity in degrees per second
+				velocity = self._aminusb(self.re - old_re) / RE_PER_DEGREE / re_time_delta
 
-			time_remaining = (angle - angle_travelled) / velocity
+				time_remaining = (angle - angle_travelled) / velocity
 
-			print('[RobotController] Rotation {}deg Velocity {}deg/s ETA {}s'.format(angle_travelled, velocity, round(time_remaining, 4)))
+				print('[RobotController] Rotation {}deg Velocity {}deg/s ETA {}s'.format(angle_travelled, velocity, round(time_remaining, 4)))
 
-			if RE_PREDICT_TIME > time_remaining >= 0:
-				end_time = self.re_time + time_remaining
-				break
+				if RE_PREDICT_TIME > time_remaining >= 0:
+					end_time = self.re_time + time_remaining
+					break
 
-		wait_until(end_time)
-		self.speed = 0
+			wait_until(end_time)
+			self.speed = 0
+		except:
+			self.speed = 0
+			raise
 
 		# Temporary
 		# TODO: Exit when it actually stops moving (when velocity goes to 0)
