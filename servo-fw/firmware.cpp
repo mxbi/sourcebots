@@ -274,10 +274,10 @@ static CommandError read_rotary_encoders(int commandId, String argument) {
   return OK;
 }
 
-static bool isSwitchPressed() {
-  int old = switchPressed;
+static CommandError is_switch_pressed(int commandId, String argument) {  
+  serialWrite(commandId, '>', String(switchPressed));
   switchPressed = false;
-  return old;
+  return OK;
 }
 
 ///////////////////// END CUSTOM FUNCTIONS ////////////////////////
@@ -298,7 +298,7 @@ static const CommandHandler commands[] = {
   CommandHandler("u", &fast_read_ultrasound, "read an ultrasound sensor <trigger-pin> <echo-pin>"),
   CommandHandler("ultrasound_read", &ultrasound_read, "read an ultrasound sensor <trigger-pin> <echo-pin>"),
   CommandHandler("r", &read_rotary_encoders, "read both rotary encoder counts, no arguments"),
-  CommandHandler("s", &isSwitchPressed, "find out if switch has been pressed"),
+  CommandHandler("s", &is_switch_pressed, "find out if switch has been pressed"),
 };
 
 static void serialWrite(int commandId, char lineType, const String& str) {
@@ -421,7 +421,7 @@ static void process_serial() {
 
   if (serialInput == ' ' && skipWS) {
     return; // ignore junk whitespace
-  } else {m
+  } else {
     skipWS = (serialInput == ' '); // ignore any successive whitespace
   }
 
@@ -429,10 +429,11 @@ static void process_serial() {
 }
 
 void loop() {
-  while (Serial.available()) {
+  if (Serial.available()) {
     process_serial();
-    if (digitalRead(6) == HIGH) {
-      switchPressed = true;
-    }
+  }
+  if (digitalRead(6) == HIGH) {
+    switchPressed = true;
   }
 }
+
