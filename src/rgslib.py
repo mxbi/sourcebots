@@ -300,3 +300,33 @@ class MarkerThread(threading.Thread):
 			vision_controller.marker_update_count += 1
 			vision_controller.last_marker_time = time.time()
 			vision_controller.last_marker_duration = time.time() - t0
+
+class GameState:
+	"""GameState calculates and stores estimates locations of all objects of interest in the game as well as localising the robot itself."""
+	def __init__(self, ):
+		self._init_wall_positions()
+		self.robot_pos = [None, None]
+
+	def _init_wall_positions(self):
+		# (x, y) of all the wall markers - see https://docs.sourcebots.co.uk/rules.pdf
+		self.wall_positions = {}
+		# Bottom wall of markers
+		for marker, x in [(20, 1), (19, 2), (18, 3), (17, 4), (16, 5), (15, 6), (16, 7)]:
+			self.wall_positions[marker] = (x*100, 0)
+		# Top wall of markers
+		for marker, x in [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7)]:
+			self.wall_positions[marker] = (x*100, 800)
+		# Right wall of markers
+		for marker, y in zip([13, 12, 11, 10, 9, 8], [1, 2, 3, 4, 5, 6, 7]):
+			self.wall_positions[marker] = (800, y*100)
+		for marker, y in zip([21, 22, 23, 24, 25, 26, 27], [1, 2, 3, 4, 5, 6, 7]):
+			self.wall_positions[marker] = (0, y*100)
+
+	def _update_robot_position(self, position):
+		# Kalman Filter?
+		raise NotImplementedError
+
+	def report_vision_marker(self, marker):
+		if marker in self.wall_positions:
+			raise NotImplementedError
+		raise NotImplementedError
