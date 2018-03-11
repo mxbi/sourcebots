@@ -14,8 +14,14 @@ RE_PER_CM = 11.13  # Rotary encodes per cm moved - ~1% error
 RE_LATENCY = 60 * ms  # Rotary encoder function lag in milliseconds - currently pulled out of my ass
 RE_PREDICT_TIME = 200 * ms  # Stop checking rotary encoder and use the current velocity to predict when this many seconds remain
 RE_MOVE_OFFSET = 8  # Breaking distance to always subtract in cm
-RE_PER_DEGREE = 8.02  # The difference in rotary encoder readings necessary to turn a degree. TODO: Find better value
-RE_ROTATE_OFFSET = 3  # The amount, in degrees, by which the robot tends to overshoot
+
+# Angle callibration
+
+# The difference in rotary encoder readings necessary to turn a degree. TODO: Find better value
+RE_PER_DEGREE = 8.02
+# Experimentally determined value which determines how much of an effect angular velocity has on when we need to stop. TODO: Find better value
+# Unit is seconds
+ROTATION_K = 0.3
 
 FAST_MOVE_SPEED = 1
 FAST_ROTATE_SPEED = 0.5
@@ -180,7 +186,6 @@ class MotionController:
 	def rotate(self, angle, speed=FAST_ROTATE_SPEED):
 		sign = np.sign(angle)  # -1 if negative, 1 if positive, 0 if 0
 
-		angle -= RE_ROTATE_OFFSET * sign
 		angles = []
 		self._update_re()
 		initial_re = self.re.copy()
@@ -209,14 +214,29 @@ class MotionController:
 					velocity = v
 				velocity = VELOCITY_UPDATE_ALPHA * v + (1 - VELOCITY_UPDATE_ALPHA) * velocity
 
-				time_remaining = (angle - angle_travelled) / velocity
+				# If we were to start braking now, what angle would we have travelled?
+				final_angle = angle_travelled + ROTATION_K * velocity
+				# How much less is that than the angle we're aiming for?
+				undershoot = angle - final_angle
+
+				# How much extra time is necessary to travel this amount?
+				time_remaining = undershoot / velocity
 
 				print('[RobotController] Rotation {}deg Velocity {}deg/s ETA {}s'.format(angle_travelled, velocity, round(time_remaining, 4)))
 
-				if RE_PREDICT_TIME > time_remaining >= 0:
+				# When the time remaining is small enough, stop checking rotary encoders and just wait out this extra time
+				# If this time is negative, either this can be for two reasons:
+				#  - The sign of velocity is wrong - the robot is moving the wrong way (should never happen)
+				#  - The robot will overshoot instead of undershoot if it brakes now, so we should stop ASAP to prevent overshooting by too much
+				# For now, assume it's the second case and stop if time_remaining is negative
+				if time_remaining < RE_PREDICT_TIME:
+					if np.sign(velocity) != sign: # Turning the wrong way!
+						# Log so if this ever happens, it'll be easier to debug
+						print('[RobotController] Warning: Turning the wrong direction!')
 					end_time = self.re_time + time_remaining
 					break
 
+			# Wait the extra time to minimise inaccuracy, if necessary
 			wait_until(end_time)
 			self.speed = 0
 		except:
