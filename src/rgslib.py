@@ -233,7 +233,7 @@ class MotionController:
 					if np.sign(velocity) != sign: # Turning the wrong way!
 						# Log so if this ever happens, it'll be easier to debug
 						print('[RobotController] Warning: Turning the wrong direction!')
-					end_time = self.re_time + time_remaining
+					end_time = time.time() + time_remaining
 					break
 
 			# Wait the extra time to minimise inaccuracy, if necessary
