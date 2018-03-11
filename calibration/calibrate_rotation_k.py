@@ -47,8 +47,11 @@ for power in test_cases:
 
 		K = re_delta / velocity
 		print('Velocity = {} K = {}'.format(power * multiplier, K))
+		all_k.append(K)
+		all_re.append(re_delta)
+		all_v.append(velocity)
 
 # mean
-K = np.mean(all_re / all_k)
+K = np.mean(all_re / all_v)
 mae = np.mean(np.abs(K - np.array(all_k)))
 print('Finished! Found K = {} MAE = {}'.format(K, mae))
