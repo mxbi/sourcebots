@@ -225,14 +225,12 @@ class MotionController:
 				print('[RobotController] Rotation {}deg Velocity {}deg/s ETA {}s'.format(angle_travelled, velocity, round(time_remaining, 4)))
 
 				# When the time remaining is small enough, stop checking rotary encoders and just wait out this extra time
-				# If this time is negative, either this can be for two reasons:
-				#  - The sign of velocity is wrong - the robot is moving the wrong way (should never happen)
+				# If this time is negative, this can be for two reasons:
+				#  - The sign of velocity is wrong - the robot is moving the wrong way temporarily
 				#  - The robot will overshoot instead of undershoot if it brakes now, so we should stop ASAP to prevent overshooting by too much
-				# For now, assume it's the second case and stop if time_remaining is negative
-				if time_remaining < RE_PREDICT_TIME:
-					if np.sign(velocity) != sign: # Turning the wrong way!
-						# Log so if this ever happens, it'll be easier to debug
-						print('[RobotController] Warning: Turning the wrong direction!')
+				# If it's the first case, we can just repeat the while loop again until the robot's velocity is corrected.
+				# If it's the second case, and the sign of the velocity is correct, we should stop
+				if time_remaining < RE_PREDICT_TIME and np.sign(velocity) == sign:
 					end_time = time.time() + time_remaining
 					break
 
