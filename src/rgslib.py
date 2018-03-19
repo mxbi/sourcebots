@@ -26,7 +26,7 @@ ROTATION_K = 0.14
 FAST_MOVE_SPEED = 1
 FAST_ROTATE_SPEED = 0.5
 
-VELOCITY_UPDATE_ALPHA = 0.25 # Update rate for velocity (v1 = alpha * d(RE)/dt + (1 -alpha) * v0)
+VELOCITY_UPDATE_ALPHA = 0.5 # Update rate for velocity (v1 = alpha * d(RE)/dt + (1 -alpha) * v0)
 
 # Use 'with nostdout():' to silence output.
 @contextlib.contextmanager
@@ -39,6 +39,8 @@ def nostdout():
 		finally:
 			sys.stdout = old_stdout
 
+def handle_arduino_bullshit():
+	raise NotImplementedError
 
 def wait_until(t):
 	"Wait until `t` in unix epoch time"
@@ -58,7 +60,6 @@ class MotionController:
 
 	# Update the rotary encoder time
 	def update_re(self):
-		t0 = time.time()
 		with nostdout():
 			self.left_re, self.right_re = [int(i) for i in self.arduino.direct_command('r')]
 		self.re = np.array([self.left_re, self.right_re])
@@ -90,8 +91,13 @@ class MotionController:
 
 	@speed.setter  # Dark magic, when "self.speed = 1" is called, update both motors
 	def speed(self, speed):
-		t0 = time.time()
-		self.r.motor_board.m0, self.r.motor_board.m1 = speed, speed
+		if hasattr(speed, '__len__'):
+			if len(speed) == 2: # Allow vectors
+				self.r.motor_board.m0, self.r.motor_board.m1 = speed
+			else:
+				raise ValueError("Tried setting speed with {} len {} ????".format(speed, len(speed)))
+		else:
+			self.r.motor_board.m0, self.r.motor_board.m1 = speed, speed
 
 	def _aminusb(self, arr):
 		return arr[0] - arr[1]
@@ -114,7 +120,6 @@ class MotionController:
 		distances = []
 		self._update_re()
 		initial_re = self.re.copy()
-		initial_time = self.re_time
 		velocity = None
 
 		try:
@@ -149,15 +154,14 @@ class MotionController:
 						breaking = 1
 						end_time = time.time()
 						break
-				if breaking == 1: break
+				if breaking == 1:
+					break
 
 				alpha = 0.05
 				# The 'sign' factor is there so that instead of speeding up the slower wheel,
 				# the faster wheel will slow down when distance < 0
-				v = speed - sign * alpha * np.maximum(0, sign * (total_distance - total_distance[::-1]))
-				vs.append(v)
-				self.mleft = v[0]
-				self.mright = v[1]
+				power = speed - sign * alpha * np.maximum(0, sign * (total_distance - total_distance[::-1]))
+				self.speed = power
 
 				time_remaining = (distance - total_distance.mean()) / velocity.mean()
 
@@ -175,16 +179,19 @@ class MotionController:
 			self.speed = 0 # If something crashes here, turn off the motors so it doesn't attack the wall
 			raise
 
-		t0 = time.time()
-
-		# Temporary
-		# TODO: Exit when it actually stops moving (when velocity goes to 0)
-		for i in range(10):
+		escape_velocity = 1
+		while v > escape_velocity:
+			old_re = self.re.copy()
+			old_re_time = self.re_time
 			self._update_re()
-			total_distance = (self.re - initial_re) / RE_PER_CM
-			distances.append(total_distance)
-			print(time.time() - t0)
-			print('[RobotController] Finished - travelled {}cm'.format((self.re - initial_re) / RE_PER_CM))
+
+			distance_travelled = (self.re - initial_re) / RE_PER_CM
+			distances.append(distance_travelled)
+
+			re_time_delta = self.re_time - old_re_time
+			v = (self.re - old_re) / RE_PER_CM / re_time_delta
+
+		print('[RobotController] Finished - travelled {}cm'.format(distance_travelled))
 
 		distance = np.mean(distances[-1])
 		self.pos[0] += distance * self.sin(self.rot)
@@ -199,13 +206,11 @@ class MotionController:
 		angles = []
 		self._update_re()
 		initial_re = self.re.copy()
-		initial_time = self.re_time
 		velocity = None
 
 		try:
 			self.mleft = speed * sign
 			self.mright = -speed * sign
-			t0 = time.time()
 
 			while True:
 				# Save last rotary encoder values for comparison
@@ -236,14 +241,12 @@ class MotionController:
 				print('[RobotController] Rotation {}deg Velocity {}deg/s ETA {}s'.format(angle_travelled, velocity, round(time_remaining, 4)))
 
 				# When the time remaining is small enough, stop checking rotary encoders and just wait out this extra time
-				# If this time is negative, either this can be for two reasons:
-				#  - The sign of velocity is wrong - the robot is moving the wrong way (should never happen)
+				# If this time is negative, this can be for two reasons:
+				#  - The sign of velocity is wrong - the robot is moving the wrong way temporarily
 				#  - The robot will overshoot instead of undershoot if it brakes now, so we should stop ASAP to prevent overshooting by too much
-				# For now, assume it's the second case and stop if time_remaining is negative
-				if time_remaining < RE_PREDICT_TIME and time.time() - t0 > 0.1:
-					if np.sign(velocity) != sign: # Turning the wrong way!
-						# Log so if this ever happens, it'll be easier to debug
-						print('[RobotController] Warning: Turning the wrong direction!')
+				# If it's the first case, we can just repeat the while loop again until the robot's velocity is corrected.
+				# If it's the second case, and the sign of the velocity is correct, we should stop
+				if time_remaining < RE_PREDICT_TIME and np.sign(velocity) == sign:
 					end_time = time.time() + time_remaining
 					break
 
@@ -254,16 +257,22 @@ class MotionController:
 			self.speed = 0
 			raise
 
-		# Temporary
-		# TODO: Exit when it actually stops moving (when velocity goes to 0)
-		for i in range(10):
-			t0 = time.time()
+		# Wait until we stop moving to get a good position estimate
+		old_re = self.re.copy()
+		escape_velocity = 1
+		while v > escape_velocity:
+			old_re = self.re.copy()
+			old_re_time = self.re_time
 			self._update_re()
-			# total_distance = (self.re - initial_re) / RE_PER_CM
-			# distances.append(total_distance)
-			print('[RobotController] Finished - travelled {}deg'.format(self._aminusb(self.re - initial_re) / RE_PER_DEGREE))
 
-		self.rot += self._aminusb(self.re - initial_re) / RE_PER_DEGREE
+			re_time_delta = self.re_time - old_re_time
+			v = self._aminusb(self.re - old_re) / RE_PER_DEGREE / re_time_delta
+			angle_travelled = self._aminusb(self.re - initial_re) / RE_PER_DEGREE
+			angles.append(angle_travelled)
+
+		print('[RobotController] Finished - travelled {}deg'.format(angle_travelled))
+
+		self.rot += angles[-1]
 
 		return angles
 
