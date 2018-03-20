@@ -29,6 +29,8 @@ FAST_ROTATE_SPEED = 0.5
 VELOCITY_UPDATE_ALPHA = 0.5 # Update rate for velocity (v1 = alpha * d(RE)/dt + (1 -alpha) * v0
 ACTIVE_CORRECTION_ALPHA = 0.05 # Intensity of active correction
 
+VISION_DISTANCE_FACTOR = 0.88 * 100 # Actual cms per sourcebots-metre
+
 # Use 'with nostdout():' to silence output.
 @contextlib.contextmanager
 def nostdout():
@@ -125,6 +127,7 @@ class MotionController:
 		Returns:
 		dict: logs
 		"""
+
 		logs = defaultdict(list)
 		logs['start_time'] = time.time()
 
@@ -139,6 +142,9 @@ class MotionController:
 		logs['debug'].append(message)
 		if verbose:
 			print(message)
+
+		if distance < 0.1:
+			return logs
 
 		try:
 			self.speed = speed * sign
@@ -200,7 +206,8 @@ class MotionController:
 			raise
 
 		escape_velocity = 1
-		while np.mean(v) > escape_velocity:
+		distance_travelled = None
+		while np.mean(v) > escape_velocity or distance_travelled is None:
 			old_re = self.re.copy()
 			old_re_time = self.re_time
 			self._update_re()
@@ -240,6 +247,9 @@ class MotionController:
 		self._update_re()
 		initial_re = self.re.copy()
 		velocity = None
+
+		if angle < 0.1:
+			return
 
 		try:
 			self.mleft = speed * sign
@@ -291,9 +301,9 @@ class MotionController:
 			raise
 
 		# Wait until we stop moving to get a good position estimate
-		old_re = self.re.copy()
 		escape_velocity = 1
-		while v > escape_velocity:
+		angle_travelled = None
+		while v > escape_velocity or angle_travelled is None:
 			old_re = self.re.copy()
 			old_re_time = self.re_time
 			self._update_re()
@@ -416,7 +426,5 @@ class GameState:
 		# Kalman Filter?
 		raise NotImplementedError
 
-	def report_vision_marker(self, marker):
-		if marker in self.wall_positions:
-			raise NotImplementedError
-		raise NotImplementedError
+	def report_vision_marker(self, markers):
+		useful_markers = [self.get_marker_type(m) in ['WALL']]
