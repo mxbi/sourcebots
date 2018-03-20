@@ -1,10 +1,10 @@
-import threading
-
 import numpy as np
 import time
 import contextlib
+import threading
 import sys
 import os
+from collections import defaultdict
 
 # Define units
 ms = 0.001
@@ -26,7 +26,8 @@ ROTATION_K = 0.14
 FAST_MOVE_SPEED = 1
 FAST_ROTATE_SPEED = 0.5
 
-VELOCITY_UPDATE_ALPHA = 0.5 # Update rate for velocity (v1 = alpha * d(RE)/dt + (1 -alpha) * v0)
+VELOCITY_UPDATE_ALPHA = 0.5 # Update rate for velocity (v1 = alpha * d(RE)/dt + (1 -alpha) * v0
+ACTIVE_CORRECTION_ALPHA = 0.05 # Intensity of active correction
 
 # Use 'with nostdout():' to silence output.
 @contextlib.contextmanager
@@ -112,8 +113,20 @@ class MotionController:
 	def sin(self, v):
 		return np.sin(v * (np.pi / 180))
 
-	def move(self, distance, speed=FAST_MOVE_SPEED, interrupts=[]):
-		"""Accurately move `distance` cm using rotary encoders. Can be negative"""
+	def move(self, distance, speed=FAST_MOVE_SPEED, interrupts=[], verbose=1):
+		"""Accurately move `distance` cm using rotary encoders. Can be negative
+
+		Parameters:
+		distance: cms to move
+		speed (default: {FAST_MOVE_SPEED}): Base motor power to move
+		interrupts: List of functions to call in a loop while moving - if any of the functions return a non-zero exit code the robot will stop.
+		verbose (default: 1): Verbosity level. 0->No messages, 1->Info messages, 2->All debug messages
+
+		Returns:
+		dict: logs
+		"""
+		logs = defaultdict(list)
+		logs['start_time'] = time.time()
 
 		sign = np.sign(distance)
 		distance -= RE_MOVE_OFFSET * sign
@@ -121,6 +134,11 @@ class MotionController:
 		self._update_re()
 		initial_re = self.re.copy()
 		velocity = None
+
+		message = "[RobotController] Move {} with motor power {}".format(distance, speed * sign)
+		logs['debug'].append(message)
+		if verbose:
+			print(message)
 
 		try:
 			self.speed = speed * sign
@@ -157,15 +175,17 @@ class MotionController:
 				if breaking == 1:
 					break
 
-				alpha = 0.05
 				# The 'sign' factor is there so that instead of speeding up the slower wheel,
 				# the faster wheel will slow down when distance < 0
-				power = speed - sign * alpha * np.maximum(0, sign * (total_distance - total_distance[::-1]))
+				power = speed - sign * ACTIVE_CORRECTION_ALPHA * np.maximum(0, sign * (total_distance - total_distance[::-1]))
 				self.speed = power
 
 				time_remaining = (distance - total_distance.mean()) / velocity.mean()
 
-				print('[RobotController] Distance {}cm Velocity {}cm/s ETA {}s'.format(total_distance, velocity, round(time_remaining, 4)))
+				message = '[RobotController] Distance {}cm Velocity {}cm/s ETA {}s'.format(total_distance, velocity, round(time_remaining, 4))
+				logs['debug'].append(message)
+				if verbose >= 2:
+					print(message)
 
 				# Because "re_time" is corrected for the latency of the re function, this pseudo-works out the time when the movement should actually finish,
 				# not when the rotary encoder says the movement should finish (which would be 60ms or so off)
@@ -180,27 +200,40 @@ class MotionController:
 			raise
 
 		escape_velocity = 1
-		while v > escape_velocity:
+		while np.mean(v) > escape_velocity:
 			old_re = self.re.copy()
 			old_re_time = self.re_time
 			self._update_re()
 
 			distance_travelled = (self.re - initial_re) / RE_PER_CM
-			distances.append(distance_travelled)
+			logs['distances'].append(distance_travelled)
 
 			re_time_delta = self.re_time - old_re_time
 			v = (self.re - old_re) / RE_PER_CM / re_time_delta
 
-		print('[RobotController] Finished - travelled {}cm'.format(distance_travelled))
+		message = '[RobotController] Finished - travelled {}cm'.format(distance_travelled)
+		logs['debug'].append(message)
+		if verbose:
+			print(message)
 
-		distance = np.mean(distances[-1])
+		distance = np.mean(logs['distances'][-1])
 		self.pos[0] += distance * self.sin(self.rot)
 		self.pos[1] += distance * self.cos(self.rot)
 
-		return distances, vs
+		return logs
 
 	# Turns the angle in degrees, where clockwise is positive and anticlockwise is negative
-	def rotate(self, angle, speed=FAST_ROTATE_SPEED):
+	def rotate(self, angle, speed=FAST_ROTATE_SPEED, verbose=1):
+		"""Accurately rotate `angle` degrees using rotary encoders. Can be negative
+
+		Parameters:
+		angle: angle to turn in degrees
+		speed (default: {FAST_ROTATE_SPEED}): Base motor power to use
+		verbose (default: 1): Verbosity level. 0->No messages, 1->Info messages, 2->All debug messages
+
+		Returns:
+		dict: logs
+		"""
 		sign = np.sign(angle)  # -1 if negative, 1 if positive, 0 if 0
 
 		angles = []
