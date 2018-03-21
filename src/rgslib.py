@@ -56,7 +56,7 @@ class MotionController:
 
 		self.reset_state()
 		self._update_re()
-
+	
 	# On destruction, set speed to 0
 	def __del__(self, robot):
 		self.speed = 0
@@ -107,6 +107,7 @@ class MotionController:
 
 	def reset_state(self):
 		self.pos = np.zeros(2)
+		# rot is degrees anticlockwise from the positive x axis
 		self.rot = np.float64(0)
 
 	def cos(self, v):
@@ -114,7 +115,16 @@ class MotionController:
 
 	def sin(self, v):
 		return np.sin(v * (np.pi / 180))
-
+	
+		
+	# Normalises an angle such that it is in the range (-180, 180].
+	# This means, for example:
+	#  - normalise_angle(270) = -90
+	#  - normalise_angle(450) = 90
+	#  - normalise_angle(180) = 180
+	def normalise_angle(theta):
+		return 180 - ((180 - theta) % 360)
+	
 	def move(self, distance, speed=FAST_MOVE_SPEED, interrupts=[], verbose=1):
 		"""Accurately move `distance` cm using rotary encoders. Can be negative
 
@@ -224,8 +234,8 @@ class MotionController:
 			print(message)
 
 		distance = np.mean(logs['distances'][-1])
-		self.pos[0] += distance * self.sin(self.rot)
-		self.pos[1] += distance * self.cos(self.rot)
+		self.pos[0] += distance * self.cos(self.rot)
+		self.pos[1] += distance * self.sin(self.rot)
 
 		return logs
 
@@ -315,8 +325,9 @@ class MotionController:
 
 		print('[RobotController] Finished - travelled {}deg'.format(angle_travelled))
 
-		self.rot += angles[-1]
-
+		# Rotation is anticlockwise whereas angle is clockwise - so subtract
+		self.rot -= angles[-1]
+		
 		return angles
 
 
