@@ -439,3 +439,41 @@ class GameState:
 
 	def report_vision_marker(self, markers):
 		useful_markers = [self.get_marker_type(m) in ['WALL']]
+	
+	# Given two markers, calculates the position of the robot
+	def _robot_position(m0, m1):
+		# Co-ordinates of each wall marker
+		x0, y0 = self.wall_positions[m0.id]
+		x1, y1 = self.wall_positions[m1.id]
+		
+		# theta is anticlockwise whereas rot_y is clockwise, hence the negative
+		theta0 = -m0.spherical.rot_y_radians
+		theta1 = -m1.spherical.rot_y_radians
+				
+		# Distances between robot and each wall marker, in cm
+		r0 = m0.spherical.distance * VISION_DISTANCE_FACTOR
+		r1 = m1.spherical.distance * VISION_DISTANCE_FACTOR
+		
+		# Converting to complex numbers makes certain operations easier, in particular rotations
+		z0 = x0 + y0 * 1j
+		z1 = x1 + y1 * 1j
+		
+		# phi is the angle between the wall markers
+		phi = theta1 - theta0
+		
+		# Distance between m0 and m1
+		marker_distance = np.abs(z1 - z0)
+		# The line that passes through m0 and m1 makes an angle of alpha with the horizontal
+		alpha = np.arcsin(r1 * np.sin(phi) / marker_distance)
+		
+		# The position of the robot as a complex number
+		z = z0 + r0 * np.exp(alpha * 1j) * (z1 - z0) / marker_distance
+		
+		# The position of the robot as a numpy array
+		pos = np.array([z.real, x.imag])
+		
+		# The angle the robot is facing measured anticlockwise from the horizontal
+		theta = np.angle(z0 - z) - theta0
+		theta_degrees = theta * (180 / np.pi)
+		
+		return pos, theta_degrees
