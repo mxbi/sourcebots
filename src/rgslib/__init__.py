@@ -46,5 +46,5 @@ def wait_until(t):
 	time.sleep(max(0, t - time.time()))
 
 from .motion import MotionController
-# from .vision import VisionController
-# from .game import GameState
+from .vision import VisionController
+from .game import GameState
