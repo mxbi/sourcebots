@@ -449,14 +449,14 @@ class GameState:
 		# theta is anticlockwise whereas rot_y is clockwise, hence the negative
 		theta0 = -m0.spherical.rot_y_radians
 		theta1 = -m1.spherical.rot_y_radians
-				
+		
 		# Distances between robot and each wall marker, in cm
 		r0 = m0.spherical.distance * VISION_DISTANCE_FACTOR
 		r1 = m1.spherical.distance * VISION_DISTANCE_FACTOR
 		
 		# Converting to complex numbers makes certain operations easier, in particular rotations
-		z0 = x0 + y0 * 1j
-		z1 = x1 + y1 * 1j
+		z0 = x0 + y0*1j
+		z1 = x1 + y1*1j
 		
 		# phi is the angle between the wall markers
 		phi = theta1 - theta0
