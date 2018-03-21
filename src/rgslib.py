@@ -4,6 +4,7 @@ import contextlib
 import threading
 import sys
 import os
+import itertools
 from collections import defaultdict
 
 # Define units
@@ -56,7 +57,7 @@ class MotionController:
 
 		self.reset_state()
 		self._update_re()
-	
+
 	# On destruction, set speed to 0
 	def __del__(self, robot):
 		self.speed = 0
@@ -115,8 +116,7 @@ class MotionController:
 
 	def sin(self, v):
 		return np.sin(v * (np.pi / 180))
-	
-		
+
 	# Normalises an angle such that it is in the range (-180, 180].
 	# This means, for example:
 	#  - normalise_angle(270) = -90
@@ -124,7 +124,7 @@ class MotionController:
 	#  - normalise_angle(180) = 180
 	def normalise_angle(theta):
 		return 180 - ((180 - theta) % 360)
-	
+
 	def move(self, distance, speed=FAST_MOVE_SPEED, interrupts=[], verbose=1):
 		"""Accurately move `distance` cm using rotary encoders. Can be negative
 
@@ -159,7 +159,6 @@ class MotionController:
 		try:
 			self.speed = speed * sign
 
-			vs = []
 			while True:
 				# Save last rotary encoder values for comparison
 				old_re = self.re.copy()
@@ -327,15 +326,18 @@ class MotionController:
 
 		# Rotation is anticlockwise whereas angle is clockwise - so subtract
 		self.rot -= angles[-1]
-		
+
 		return angles
 
 
 class VisionController:
 	# Gets passed the Robot() instance so it can use the cameras
-	def __init__(self, robot):
+	def __init__(self, robot, gamestate=None):
 		self.r = robot
 		self.camera = robot.camera
+		self.gamestate = gamestate
+		if self.gamestate is None:
+			print('[VisionController][WARN] No GameState passed to VisionController, functionality will be reduced')
 
 		# Can't see any markers initially
 		self.markers = []
@@ -389,6 +391,8 @@ class MarkerThread(threading.Thread):
 			t0 = time.time()
 
 			vision_controller.markers = camera.see()
+			if vision_controller.gamestate is not None:
+				vision_controller.gamestate.report_vision_markers(vision_controller.markers)
 
 			vision_controller.marker_update_count += 1
 			vision_controller.last_marker_time = time.time()
@@ -401,6 +405,7 @@ class GameState:
 		self.marker_id_mapping = {'WALL': WALL, 'COLUMN': COLUMN, 'TOKEN_ZONE_0': TOKEN_ZONE_0, 'TOKEN_ZONE_1': TOKEN_ZONE_1, 'TOKEN_ZONE_2': TOKEN_ZONE_2, 'TOKEN_ZONE_3': TOKEN_ZONE_3}
 		self._init_wall_positions()
 		self.robot_pos = [None, None]
+		self.robot_rot = None
 
 		assert friendly_zone in [0, 1, 2, 3]
 		self.friendly_zone = friendly_zone
@@ -437,43 +442,73 @@ class GameState:
 		# Kalman Filter?
 		raise NotImplementedError
 
-	def report_vision_marker(self, markers):
-		useful_markers = [self.get_marker_type(m) in ['WALL']]
-	
+	def report_vision_markers(self, markers):
+		useful_markers = [m for m in markers if self.get_marker_type(m) in ['WALL', 'COLUMN']]
+		if len(useful_markers) == 0:
+			print('[GameState] No anchored markers')
+			return
+		elif len(useful_markers) == 1:
+			print('[GameState] Only one anchored marker')
+		else:
+			combinations = itertools.combinations(useful_markers, 2)
+			positions = []
+			rotations = []
+			for stuff in combinations:
+				pos, rot = self._robot_position(*stuff)
+				positions.append(pos)
+				rotations.append(rot)
+			pos = np.mean(positions, axis=0)
+			rot = np.mean(rotations, axis=0)
+			print('[GameState] Found {} markers, determined position {} rotation {}'.format(len(useful_markers), pos, rot))
+			self.robot_pos = pos
+			self.robot_rot = rot
+			return pos, rot
+
 	# Given two markers, calculates the position of the robot
-	def _robot_position(m0, m1):
+	def _robot_position(self, m0, m1):
 		# Co-ordinates of each wall marker
 		x0, y0 = self.wall_positions[m0.id]
 		x1, y1 = self.wall_positions[m1.id]
-		
+
 		# theta is anticlockwise whereas rot_y is clockwise, hence the negative
 		theta0 = -m0.spherical.rot_y_radians
 		theta1 = -m1.spherical.rot_y_radians
-		
+
 		# Distances between robot and each wall marker, in cm
-		r0 = m0.spherical.distance * VISION_DISTANCE_FACTOR
-		r1 = m1.spherical.distance * VISION_DISTANCE_FACTOR
-		
+		r0 = m0.distance_metres * VISION_DISTANCE_FACTOR
+		r1 = m1.distance_metres * VISION_DISTANCE_FACTOR
+
 		# Converting to complex numbers makes certain operations easier, in particular rotations
 		z0 = x0 + y0*1j
 		z1 = x1 + y1*1j
-		
+
 		# phi is the angle between the wall markers
 		phi = theta1 - theta0
-		
+		# print(phi, theta1, theta0, np.sin(phi), np.abs(z1 - z0))
+
 		# Distance between m0 and m1
 		marker_distance = np.abs(z1 - z0)
 		# The line that passes through m0 and m1 makes an angle of alpha with the horizontal
-		alpha = np.arcsin(r1 * np.sin(phi) / marker_distance)
-		
+		# Calculation using sine rule (uses inaccurate angle)
+		alpha_sin = np.arcsin(np.clip((r1 * np.sin(phi)) / marker_distance, -1.0, 1.0))
+		# Robust calculation using cosine rule and only distances
+		cosalpha = (r0 ** 2 + marker_distance ** 2 - r1 ** 2) / (2 * r0 * marker_distance)
+		if np.abs(cosalpha) > 1:
+			print('[GameState][WARN] Calculated cosalpha out of bounds, clipping')
+		alpha = np.arccos(np.clip(cosalpha, -1.0, 1.0))
+
+		# Select +/- alpha depending on which one is nearest to (inaccurate) sine rule. This finds the correct solution to the cosine rule (as it has two solutions)
+		alphas = np.array([alpha, -alpha])
+		alpha = alphas[np.argmin(np.abs(alphas - alpha_sin))]
+
 		# The position of the robot as a complex number
 		z = z0 + r0 * np.exp(alpha * 1j) * (z1 - z0) / marker_distance
-		
+
 		# The position of the robot as a numpy array
-		pos = np.array([z.real, x.imag])
-		
+		pos = np.array([z.real, z.imag])
+
 		# The angle the robot is facing measured anticlockwise from the horizontal
 		theta = np.angle(z0 - z) - theta0
 		theta_degrees = theta * (180 / np.pi)
-		
+
 		return pos, theta_degrees
