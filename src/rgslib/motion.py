@@ -48,9 +48,12 @@ class MotionController:
 	def speed(self):
 		return (self.mleft, self.mright)
 
-	@property
-	def rot(self):
-		return normalise(self.rot)
+	# @property
+	# def rot(self):
+	# 	return self.normalise(self.rot)
+    #
+    # @rot.setter(self, rot):
+    #     self.rot = self.normalise(rot)
 
 	@speed.setter  # Dark magic, when "self.speed = 1" is called, update both motors
 	def speed(self, speed):
@@ -68,7 +71,7 @@ class MotionController:
 	def reset_state(self):
 		self.pos = np.zeros(2)
 		# rot is degrees anticlockwise from the positive x axis
-		self.rot = np.float64(0)
+		# self.rot = np.float64(0)
 
 	def cos(self, v):
 		return np.cos(v * (np.pi / 180))
@@ -192,8 +195,8 @@ class MotionController:
 			print(message)
 
 		distance = np.mean(logs['distances'][-1])
-		self.pos[0] += distance * self.cos(self.rot)
-		self.pos[1] += distance * self.sin(self.rot)
+		# self.pos[0] += distance * self.cos(self.rot)
+		# self.pos[1] += distance * self.sin(self.rot)
 
 		return logs
 
@@ -284,6 +287,6 @@ class MotionController:
 		print('[RobotController] Finished - travelled {}deg'.format(angle_travelled))
 
 		# Rotation is anticlockwise whereas angle is clockwise - so subtract
-		self.rot -= angles[-1]
+		# self.rot -= angles[-1]
 
 		return angles
