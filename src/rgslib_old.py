@@ -4,6 +4,7 @@ import contextlib
 import threading
 import sys
 import os
+import itertools
 from collections import defaultdict
 
 # Define units
@@ -28,6 +29,8 @@ FAST_ROTATE_SPEED = 0.5
 
 VELOCITY_UPDATE_ALPHA = 0.5 # Update rate for velocity (v1 = alpha * d(RE)/dt + (1 -alpha) * v0
 ACTIVE_CORRECTION_ALPHA = 0.05 # Intensity of active correction
+
+VISION_DISTANCE_FACTOR = 0.88 * 100 # Actual cms per sourcebots-metre
 
 # Use 'with nostdout():' to silence output.
 @contextlib.contextmanager
@@ -105,6 +108,7 @@ class MotionController:
 
 	def reset_state(self):
 		self.pos = np.zeros(2)
+		# rot is degrees anticlockwise from the positive x axis
 		self.rot = np.float64(0)
 
 	def cos(self, v):
@@ -112,6 +116,14 @@ class MotionController:
 
 	def sin(self, v):
 		return np.sin(v * (np.pi / 180))
+
+	# Normalises an angle such that it is in the range (-180, 180].
+	# This means, for example:
+	#  - normalise_angle(270) = -90
+	#  - normalise_angle(450) = 90
+	#  - normalise_angle(180) = 180
+	def normalise_angle(theta):
+		return 180 - ((180 - theta) % 360)
 
 	def move(self, distance, speed=FAST_MOVE_SPEED, interrupts=[], verbose=1):
 		"""Accurately move `distance` cm using rotary encoders. Can be negative
@@ -125,6 +137,7 @@ class MotionController:
 		Returns:
 		dict: logs
 		"""
+
 		logs = defaultdict(list)
 		logs['start_time'] = time.time()
 
@@ -140,10 +153,12 @@ class MotionController:
 		if verbose:
 			print(message)
 
+		if distance < 0.1:
+			return logs
+
 		try:
 			self.speed = speed * sign
 
-			vs = []
 			while True:
 				# Save last rotary encoder values for comparison
 				old_re = self.re.copy()
@@ -200,7 +215,8 @@ class MotionController:
 			raise
 
 		escape_velocity = 1
-		while np.mean(v) > escape_velocity:
+		distance_travelled = None
+		while np.mean(v) > escape_velocity or distance_travelled is None:
 			old_re = self.re.copy()
 			old_re_time = self.re_time
 			self._update_re()
@@ -217,8 +233,8 @@ class MotionController:
 			print(message)
 
 		distance = np.mean(logs['distances'][-1])
-		self.pos[0] += distance * self.sin(self.rot)
-		self.pos[1] += distance * self.cos(self.rot)
+		self.pos[0] += distance * self.cos(self.rot)
+		self.pos[1] += distance * self.sin(self.rot)
 
 		return logs
 
@@ -240,6 +256,9 @@ class MotionController:
 		self._update_re()
 		initial_re = self.re.copy()
 		velocity = None
+
+		if angle < 0.1:
+			return
 
 		try:
 			self.mleft = speed * sign
@@ -291,9 +310,9 @@ class MotionController:
 			raise
 
 		# Wait until we stop moving to get a good position estimate
-		old_re = self.re.copy()
 		escape_velocity = 1
-		while v > escape_velocity:
+		angle_travelled = None
+		while v > escape_velocity or angle_travelled is None:
 			old_re = self.re.copy()
 			old_re_time = self.re_time
 			self._update_re()
@@ -305,16 +324,20 @@ class MotionController:
 
 		print('[RobotController] Finished - travelled {}deg'.format(angle_travelled))
 
-		self.rot += angles[-1]
+		# Rotation is anticlockwise whereas angle is clockwise - so subtract
+		self.rot -= angles[-1]
 
 		return angles
 
 
 class VisionController:
 	# Gets passed the Robot() instance so it can use the cameras
-	def __init__(self, robot):
+	def __init__(self, robot, gamestate=None):
 		self.r = robot
 		self.camera = robot.camera
+		self.gamestate = gamestate
+		if self.gamestate is None:
+			print('[VisionController][WARN] No GameState passed to VisionController, functionality will be reduced')
 
 		# Can't see any markers initially
 		self.markers = []
@@ -368,55 +391,9 @@ class MarkerThread(threading.Thread):
 			t0 = time.time()
 
 			vision_controller.markers = camera.see()
+			if vision_controller.gamestate is not None:
+				vision_controller.gamestate.report_vision_markers(vision_controller.markers)
 
 			vision_controller.marker_update_count += 1
 			vision_controller.last_marker_time = time.time()
 			vision_controller.last_marker_duration = time.time() - t0
-
-class GameState:
-	"""GameState calculates and stores estimates locations of all objects of interest in the game as well as localising the robot itself."""
-	def __init__(self, friendly_zone):
-		from robot import WALL, COLUMN, TOKEN_ZONE_0, TOKEN_ZONE_1, TOKEN_ZONE_2, TOKEN_ZONE_3
-		self.marker_id_mapping = {'WALL': WALL, 'COLUMN': COLUMN, 'TOKEN_ZONE_0': TOKEN_ZONE_0, 'TOKEN_ZONE_1': TOKEN_ZONE_1, 'TOKEN_ZONE_2': TOKEN_ZONE_2, 'TOKEN_ZONE_3': TOKEN_ZONE_3}
-		self._init_wall_positions()
-		self.robot_pos = [None, None]
-
-		assert friendly_zone in [0, 1, 2, 3]
-		self.friendly_zone = friendly_zone
-
-		# self._init_marker_types()
-
-	def _init_wall_positions(self):
-		# (x, y) of all the wall markers - see https://docs.sourcebots.co.uk/rules.pdf
-		self.wall_positions = {}
-		# Bottom wall of markers
-		for marker, x in [(20, 1), (19, 2), (18, 3), (17, 4), (16, 5), (15, 6), (16, 7)]:
-			self.wall_positions[marker] = (x*100, 0)
-		# Top wall of markers
-		for marker, x in [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7)]:
-			self.wall_positions[marker] = (x*100, 800)
-		# Right wall of markers
-		for marker, y in zip([13, 12, 11, 10, 9, 8], [1, 2, 3, 4, 5, 6, 7]):
-			self.wall_positions[marker] = (800, y*100)
-		for marker, y in zip([21, 22, 23, 24, 25, 26, 27], [1, 2, 3, 4, 5, 6, 7]):
-			self.wall_positions[marker] = (0, y*100)
-
-	def get_marker_type(self, marker):
-		friendly_marker = self.marker_id_mapping['TOKEN_ZONE_{}'.format(self.friendly_zone)]
-		if marker.id in self.marker_id_mapping['WALL']:
-			return 'WALL'
-		elif marker.id in self.marker_id_mapping['COLUMN']:
-			return 'COLUMN'
-		elif marker.id in friendly_marker:
-			return 'FRIENDLY'
-		else:
-			return 'ENEMY'
-
-	def _update_robot_position(self, position):
-		# Kalman Filter?
-		raise NotImplementedError
-
-	def report_vision_marker(self, marker):
-		if marker in self.wall_positions:
-			raise NotImplementedError
-		raise NotImplementedError
