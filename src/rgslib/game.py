@@ -1,6 +1,7 @@
 import numpy as np
 import itertools
 
+from . import normalise_angle
 from . import VISION_DISTANCE_FACTOR
 
 class GameState:
@@ -114,6 +115,6 @@ class GameState:
 
 		# The angle the robot is facing measured anticlockwise from the horizontal
 		theta = np.angle(z0 - z) - theta0
-		theta_degrees = theta * (180 / np.pi)
+		theta_degrees = normalise_angle(theta * (180 / np.pi))
 
 		return pos, theta_degrees

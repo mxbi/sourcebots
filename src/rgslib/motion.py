@@ -2,7 +2,7 @@ import numpy as np
 import time
 from collections import defaultdict
 
-from . import nostdout, wait_until
+from . import nostdout, wait_until, normalise_angle
 from . import RE_LATENCY, FAST_MOVE_SPEED, RE_MOVE_OFFSET, RE_PER_CM, VELOCITY_UPDATE_ALPHA, ACTIVE_CORRECTION_ALPHA, RE_PREDICT_TIME, FAST_ROTATE_SPEED, RE_PER_DEGREE, ROTATION_K
 
 class MotionController:
@@ -47,6 +47,10 @@ class MotionController:
 	@property
 	def speed(self):
 		return (self.mleft, self.mright)
+
+	@property
+	def rot(self):
+		return normalise(self.rot)
 
 	@speed.setter  # Dark magic, when "self.speed = 1" is called, update both motors
 	def speed(self, speed):

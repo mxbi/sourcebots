@@ -45,6 +45,14 @@ def wait_until(t):
 	"Wait until `t` in unix epoch time"
 	time.sleep(max(0, t - time.time()))
 
+# Normalises an angle such that it is in the range (-180, 180].
+# This means, for example:
+#  - normalise_angle(270) = -90
+#  - normalise_angle(450) = 90
+#  - normalise_angle(180) = 180
+def normalise_angle(theta):
+	return 180 - ((180 - theta) % 360)
+
 from .motion import MotionController
 from .vision import VisionController
 from .game import GameState
