@@ -1,6 +1,7 @@
+//#include <ArduinoSTL.h>
+#include <Adafruit_PWMServoDriver.h>
 //#define ENCODER_OPTIMIZE_INTERRUPTS
 #include <Encoder.h>
-#include <Servo.h>
 
 // Multiplying by this converts round-trip duration in microseconds to distance to object in millimetres.
 static const float ULTRASOUND_COEFFICIENT = 1e-6 * 343.0 * 0.5 * 1e3;
@@ -14,15 +15,14 @@ typedef String CommandError;
 static const CommandError OK = "";
 #define COMMAND_ERROR(x) ((x))
 
+static Adafruit_PWMServoDriver SERVOS = Adafruit_PWMServoDriver();
+
 static String pop_option(String& argument);
 static void serialWrite(int commandId, char lineType, const String& str);
 
 // Define rotary encoders
 Encoder encoderLeft(2, 4);
 Encoder encoderRight(3, 5);
-
-// Define servo
-Servo frontServo;
 
 // Switch var
 static bool switchPressed = false;
@@ -37,8 +37,8 @@ void setup() {
   Serial.begin(9600);
   Serial.setTimeout(5);
 
-  pinMode(9, OUTPUT);
-  frontServo.attach(9);
+  SERVOS.begin();
+  SERVOS.setPWMFreq(50);
 
   Serial.write("# booted\n");
 }
@@ -85,17 +85,21 @@ static CommandError led(int commandId, String argument) {
 
 static CommandError servo(int commandId, String argument) {
   String servoArg = pop_option(argument);
-  String uselessArg = pop_option(argument);
+  String widthArg = pop_option(argument);
 
-  if (argument.length() || !servoArg.length() || !uselessArg.length()) {
+  if (argument.length() || !servoArg.length() || !widthArg.length()) {
     return COMMAND_ERROR("servo takes exactly two arguments");
   }
 
+  auto width = widthArg.toInt();
   auto servo = servoArg.toInt();
-//  if (servo < 0 || servo > 180) {
-//    return COMMAND_ERROR("Position out of range");
-//  }
-  frontServo.write(servo);
+  if (servo < 0 || servo > 15) {
+    return COMMAND_ERROR("servo index out of range");
+  }
+  if (width != 0 && (width < 150 || width > 550)) {
+    return COMMAND_ERROR("width must be 0 or between 150 and 550");
+  }
+  SERVOS.setPWM(servo, 0, width);
   return OK;
 }
 
