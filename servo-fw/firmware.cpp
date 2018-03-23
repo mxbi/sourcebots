@@ -22,7 +22,7 @@ Encoder encoderLeft(2, 4);
 Encoder encoderRight(3, 5);
 
 // Define servo
-Servo frontServo;
+Servo barrierServo;
 
 // Switch var
 static bool switchPressed = false;
@@ -38,7 +38,8 @@ void setup() {
   Serial.setTimeout(5);
 
   pinMode(9, OUTPUT);
-  frontServo.attach(9);
+  barrierServo.attach(9);
+  barrierServo.write(97);
 
   Serial.write("# booted\n");
 }
@@ -84,18 +85,18 @@ static CommandError led(int commandId, String argument) {
 }
 
 static CommandError servo(int commandId, String argument) {
-  String servoArg = pop_option(argument);
+  String positionArg = pop_option(argument);
   String uselessArg = pop_option(argument);
 
   if (argument.length() || !servoArg.length() || !uselessArg.length()) {
     return COMMAND_ERROR("servo takes exactly two arguments");
   }
 
-  auto servo = servoArg.toInt();
+  auto positionInt = positionArg.toInt();
 //  if (servo < 0 || servo > 180) {
 //    return COMMAND_ERROR("Position out of range");
 //  }
-  frontServo.write(servo);
+  barrierServo.write(positionInt);
   return OK;
 }
 
