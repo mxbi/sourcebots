@@ -13,6 +13,8 @@ class MotionController:
 		self.reset_state()
 		self._update_re()
 
+		self.barrier_raised = False
+
 	# On destruction, set speed to 0
 	def __del__(self, robot):
 		self.speed = 0
@@ -86,6 +88,14 @@ class MotionController:
 	#  - normalise_angle(180) = 180
 	def normalise_angle(theta):
 		return 180 - ((180 - theta) % 360)
+
+	def open_barrier(self):
+    	self.arduino.direct_command('servo', 180, 0)
+    	self.barrier_raised = True
+  
+  	def close_barrier(self):
+    	self.arduino.direct_command('servo', 97, 0)
+    	self.barrier_raised = False
 
 	def move(self, distance, speed=FAST_MOVE_SPEED, interrupts=[], verbose=1):
 		"""Accurately move `distance` cm using rotary encoders. Can be negative
