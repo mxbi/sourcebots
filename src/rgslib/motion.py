@@ -2,8 +2,11 @@ import numpy as np
 import time
 from collections import defaultdict
 
-from . import nostdout, wait_until, normalise_angle
-from . import RE_LATENCY, FAST_MOVE_SPEED, RE_MOVE_OFFSET, RE_PER_CM, VELOCITY_UPDATE_ALPHA, ACTIVE_CORRECTION_ALPHA, RE_PREDICT_TIME, FAST_ROTATE_SPEED, RE_PER_DEGREE, ROTATION_K
+from . import trig
+from . import nostdout, wait_until
+from . import RE_LATENCY, FAST_MOVE_SPEED, RE_MOVE_OFFSET, RE_PER_CM, VELOCITY_UPDATE_ALPHA, ACTIVE_CORRECTION_ALPHA, \
+	RE_PREDICT_TIME, FAST_ROTATE_SPEED, RE_PER_DEGREE, ROTATION_K
+
 
 class MotionController:
 	def __init__(self, robot):
@@ -48,14 +51,14 @@ class MotionController:
 
 	@property
 	def speed(self):
-		return (self.mleft, self.mright)
+		return self.mleft, self.mright
 
 	# @property
 	# def rot(self):
-	# 	return self.normalise(self.rot)
-    #
-    # @rot.setter(self, rot):
-    #     self.rot = self.normalise(rot)
+	# 	return normalise_angle_degrees(self.rot)
+	#
+	# @rot.setter(self, rot):
+	#     self.rot = normalise_angle_degrees(rot)
 
 	@speed.setter  # Dark magic, when "self.speed = 1" is called, update both motors
 	def speed(self, speed):
@@ -73,29 +76,15 @@ class MotionController:
 	def reset_state(self):
 		self.pos = np.zeros(2)
 		# rot is degrees anticlockwise from the positive x axis
-		# self.rot = np.float64(0)
-
-	def cos(self, v):
-		return np.cos(v * (np.pi / 180))
-
-	def sin(self, v):
-		return np.sin(v * (np.pi / 180))
-
-	# Normalises an angle such that it is in the range (-180, 180].
-	# This means, for example:
-	#  - normalise_angle(270) = -90
-	#  - normalise_angle(450) = 90
-	#  - normalise_angle(180) = 180
-	def normalise_angle(theta):
-		return 180 - ((180 - theta) % 360)
+		self.rot = np.float64(0)
 
 	def open_barrier(self):
-    	self.arduino.direct_command('servo', 180, 0)
-    	self.barrier_raised = True
-  
-  	def close_barrier(self):
-    	self.arduino.direct_command('servo', 97, 0)
-    	self.barrier_raised = False
+		self.arduino.direct_command('servo', 180, 0)
+		self.barrier_raised = True
+
+	def close_barrier(self):
+		self.arduino.direct_command('servo', 97, 0)
+		self.barrier_raised = False
 
 	def move(self, distance, speed=FAST_MOVE_SPEED, interrupts=[], verbose=1):
 		"""Accurately move `distance` cm using rotary encoders. Can be negative
@@ -183,7 +172,7 @@ class MotionController:
 			wait_until(end_time)
 			self.speed = 0
 		except:
-			self.speed = 0 # If something crashes here, turn off the motors so it doesn't attack the wall
+			self.speed = 0  # If something crashes here, turn off the motors so it doesn't attack the wall
 			raise
 
 		escape_velocity = 1
@@ -205,8 +194,7 @@ class MotionController:
 			print(message)
 
 		distance = np.mean(logs['distances'][-1])
-		# self.pos[0] += distance * self.cos(self.rot)
-		# self.pos[1] += distance * self.sin(self.rot)
+		self.pos += trig.to_cartesian_degrees(self.rot, distance)
 
 		return logs
 
@@ -297,6 +285,6 @@ class MotionController:
 		print('[RobotController] Finished - travelled {}deg'.format(angle_travelled))
 
 		# Rotation is anticlockwise whereas angle is clockwise - so subtract
-		# self.rot -= angles[-1]
+		self.rot -= angles[-1]
 
 		return angles

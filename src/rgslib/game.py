@@ -1,8 +1,9 @@
 import numpy as np
 import itertools
 
-from . import normalise_angle
+from . import trig
 from . import VISION_DISTANCE_FACTOR
+
 
 class GameState:
 	"""GameState calculates and stores estimates locations of all objects of interest in the game as well as localising the robot itself."""
@@ -70,7 +71,7 @@ class GameState:
 			self.robot_rot = rot
 			return pos, rot
 
-	# Given two markers, calculates the position of the robot
+	# Given two markers, calculates the position and rotation of the robot
 	def _robot_position(self, m0, m1):
 		# Co-ordinates of each wall marker
 		x0, y0 = self.wall_positions[m0.id]
@@ -89,23 +90,14 @@ class GameState:
 		z1 = x1 + y1*1j
 
 		# phi is the angle between the wall markers
-		phi = theta1 - theta0
-		# print(phi, theta1, theta0, np.sin(phi), np.abs(z1 - z0))
+		phi = trig.normalise_angle_radians(theta1 - theta0)
+		phi_sign = 1 if phi > 0 else -1
 
 		# Distance between m0 and m1
 		marker_distance = np.abs(z1 - z0)
-		# The line that passes through m0 and m1 makes an angle of alpha with the horizontal
-		# Calculation using sine rule (uses inaccurate angle)
-		alpha_sin = np.arcsin(np.clip((r1 * np.sin(phi)) / marker_distance, -1.0, 1.0))
-		# Robust calculation using cosine rule and only distances
-		cosalpha = (r0 ** 2 + marker_distance ** 2 - r1 ** 2) / (2 * r0 * marker_distance)
-		if np.abs(cosalpha) > 1:
-			print('[GameState][WARN] Calculated cosalpha out of bounds, clipping')
-		alpha = np.arccos(np.clip(cosalpha, -1.0, 1.0))
 
-		# Select +/- alpha depending on which one is nearest to (inaccurate) sine rule. This finds the correct solution to the cosine rule (as it has two solutions)
-		alphas = np.array([alpha, -alpha])
-		alpha = alphas[np.argmin(np.abs(alphas - alpha_sin))]
+		# The line that passes through m0 and m1 makes an angle of alpha with the horizontal
+		alpha = (r0 ** 2 + marker_distance ** 2 - r1 ** 2) / (2 * r0 * marker_distance) * phi_sign
 
 		# The position of the robot as a complex number
 		z = z0 + r0 * np.exp(alpha * 1j) * (z1 - z0) / marker_distance
@@ -115,6 +107,6 @@ class GameState:
 
 		# The angle the robot is facing measured anticlockwise from the horizontal
 		theta = np.angle(z0 - z) - theta0
-		theta_degrees = normalise_angle(theta * (180 / np.pi))
+		theta_degrees = trig.normalise_angle_degrees(theta * (180/np.pi))
 
 		return pos, theta_degrees
