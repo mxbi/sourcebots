@@ -9,7 +9,7 @@ from . import RE_LATENCY, FAST_MOVE_SPEED, RE_MOVE_OFFSET, RE_PER_CM, VELOCITY_U
 
 
 class MotionController:
-	def __init__(self, robot):
+	def __init__(self, robot, gamestate=None):
 		self.r = robot
 		self.arduino = self.r.servo_board
 
@@ -17,6 +17,10 @@ class MotionController:
 		self._update_re()
 
 		self.barrier_raised = False
+
+		self.gamestate = gamestate
+		if gamestate is None:
+			print('[MotionController][WARN] No GameState passed to MotionController, functionality will be reduced')
 
 	# On destruction, set speed to 0
 	def __del__(self, robot):
@@ -66,6 +70,22 @@ class MotionController:
 				raise ValueError("Tried setting speed with {} len {} ????".format(speed, len(speed)))
 		else:
 			self.r.motor_board.m0, self.r.motor_board.m1 = speed, speed
+
+	def move_to(self, target_pos):
+		# Where we currently are
+		current_pos, current_rot = self.gamestate.robot_pos, self.gamestate.robot_rot
+
+		# How we need to move
+		motion = target_pos - current_pos
+
+		# Which way we need to be facing
+		target_rot, distance = trig.to_polar_degrees(motion)
+
+		# How we need to turn to face that direction
+		angle = target_rot - current_rot
+
+		self.rotate(-angle)
+		self.move(distance)
 
 	def _aminusb(self, arr):
 		return arr[0] - arr[1]
