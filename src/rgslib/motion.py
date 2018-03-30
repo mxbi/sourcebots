@@ -53,17 +53,14 @@ class MotionController:
 	def speed(self):
 		return self.mleft, self.mright
 
-	# @property
-	# def rot(self):
-	# 	return normalise_angle_degrees(self.rot)
-	#
-	# @rot.setter(self, rot):
-	#     self.rot = normalise_angle_degrees(rot)
+	@property
+	def rot(self):
+		return normalise_angle_degrees(self._rot)
 
 	@speed.setter  # Dark magic, when "self.speed = 1" is called, update both motors
 	def speed(self, speed):
 		if hasattr(speed, '__len__'):
-			if len(speed) == 2: # Allow vectors
+			if len(speed) == 2:  # Allow vectors
 				self.r.motor_board.m0, self.r.motor_board.m1 = speed
 			else:
 				raise ValueError("Tried setting speed with {} len {} ????".format(speed, len(speed)))
@@ -76,7 +73,7 @@ class MotionController:
 	def reset_state(self):
 		self.pos = np.zeros(2)
 		# rot is degrees anticlockwise from the positive x axis
-		self.rot = np.float64(0)
+		self._rot = np.float64(0)
 
 	def open_barrier(self):
 		self.arduino.direct_command('servo', 180, 0)
@@ -285,6 +282,6 @@ class MotionController:
 		print('[RobotController] Finished - travelled {}deg'.format(angle_travelled))
 
 		# Rotation is anticlockwise whereas angle is clockwise - so subtract
-		self.rot -= angles[-1]
+		self._rot -= angles[-1]
 
 		return angles
