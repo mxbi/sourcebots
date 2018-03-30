@@ -111,7 +111,7 @@ class MotionController:
 		if verbose:
 			print(message)
 
-		if distance < 0.1:
+		if distance <= RE_MOVE_OFFSET:
 			return logs
 
 		try:
