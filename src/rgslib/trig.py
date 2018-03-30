@@ -53,7 +53,7 @@ def tan_degrees(theta):
 
 # Converts polar co-ordinates (angle from horizontal, magnitude) into a numpy array (x, y)
 def to_cartesian_radians(theta, r):
-	return r * np.array([np.cos(theta, np.sin(theta))])
+	return r * np.array([np.cos(theta), np.sin(theta)])
 
 
 # Converts polar co-ordinates (angle from horizontal, magnitude) into a numpy array (x, y)
