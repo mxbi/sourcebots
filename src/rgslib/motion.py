@@ -86,8 +86,8 @@ class MotionController:
 		# Which way we need to be facing
 		target_rot, distance = trig.to_polar_degrees(motion)
 
-		# How we need to turn to face that direction
-		angle = target_rot - current_rot
+		# How much we need to turn to face that direction
+		angle = trig.normalise_angle_degrees(target_rot - current_rot)
 
 		# angle is anticlockwise, rotate accepts clockwise, so -
 		self.rotate(-angle)
