@@ -61,6 +61,10 @@ class MotionController:
 	def rot(self):
 		return normalise_angle_degrees(self._rot)
 
+	@rot.setter
+	def rot(self, val):
+		self._rot = val
+
 	@speed.setter  # Dark magic, when "self.speed = 1" is called, update both motors
 	def speed(self, speed):
 		if hasattr(speed, '__len__'):
@@ -71,6 +75,7 @@ class MotionController:
 		else:
 			self.r.motor_board.m0, self.r.motor_board.m1 = speed, speed
 
+	# Warning: does not handle pillars
 	def move_to(self, target_pos):
 		# Where we currently are
 		current_pos, current_rot = self.gamestate.robot_pos, self.gamestate.robot_rot
@@ -84,6 +89,7 @@ class MotionController:
 		# How we need to turn to face that direction
 		angle = target_rot - current_rot
 
+		# angle is anticlockwise, rotate accepts clockwise, so -
 		self.rotate(-angle)
 		self.move(distance)
 
@@ -93,7 +99,7 @@ class MotionController:
 	def reset_state(self):
 		self.pos = np.zeros(2)
 		# rot is degrees anticlockwise from the positive x axis
-		self._rot = np.float64(0)
+		self.rot = np.float64(0)
 
 	def open_barrier(self):
 		self.arduino.direct_command('servo', 180, 0)
@@ -302,6 +308,6 @@ class MotionController:
 		print('[RobotController] Finished - travelled {}deg'.format(angle_travelled))
 
 		# Rotation is anticlockwise whereas angle is clockwise - so subtract
-		self._rot -= angles[-1]
+		self.rot -= angles[-1]
 
 		return angles
