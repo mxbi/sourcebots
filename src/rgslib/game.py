@@ -97,7 +97,7 @@ class GameState:
 		marker_distance = np.abs(z1 - z0)
 
 		# The line that passes through m0 and m1 makes an angle of alpha with the horizontal
-		alpha = (r0 ** 2 + marker_distance ** 2 - r1 ** 2) / (2 * r0 * marker_distance) * phi_sign
+		alpha = np.arccos((r0 ** 2 + marker_distance ** 2 - r1 ** 2) / (2 * r0 * marker_distance)) * phi_sign
 
 		# The position of the robot as a complex number
 		z = z0 + r0 * np.exp(alpha * 1j) * (z1 - z0) / marker_distance
