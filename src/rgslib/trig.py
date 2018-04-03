@@ -10,7 +10,7 @@ def normalise_angle_degrees(theta):
 	return _normalise_angle(theta, 180)
 
 
-# Normalises an angle into the range (-π. π].
+# Normalises an angle into the range (-pi. pi].
 def normalise_angle_radians(theta):
 	return _normalise_angle(theta, np.pi)
 
