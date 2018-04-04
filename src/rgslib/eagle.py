@@ -40,11 +40,11 @@ def draw_arena(screen, s, vision):
 		pygame.draw.lines(screen, WHITE*0.7, True, corners)
 
 	# Columns
-	columns = [(182, 419), (582, 419), (382, 619), (382, 219)] # Top-left corner
+	columns = [(182, 419), (582, 419), (382, 619), (382, 219)]  # Top-left corners
 	column_size = 37
 	for c in columns:
 		c = transform(c)
-		corners = box(c, column_size) #[c, (c[0]+column_size, c[1]), (c[0]+column_size, c[1]+column_size), (c[0], c[1]+column_size)] # Infer all corners from top-left corner (by adding column_size)
+		corners = box(c, column_size)
 		pygame.draw.lines(screen, BLACK, True, corners)
 
 	# Draw marker text
@@ -133,11 +133,11 @@ class EagleThread(threading.Thread):
 
 				# Print elapsed time
 				msg_font = pygame.font.SysFont("roboto", 36)
-				text = msg_font.render("{:.2f}s".format(s.elapsed_time()), True, BLACK)
-				screen.blit(text, (25, 25))
+				text = msg_font.render("{:.2f}s".format(self.gamestate.elapsed_time()), True, BLACK)
+				self.screen.blit(text, (25, 25))
 
-				pygame.display.flip() # Swap frame buffers, print current buffer to display
-				time.sleep(t0 - (1 / self.framerate)) # Wait remaining frametime
+				pygame.display.flip()  # Swap frame buffers, print current buffer to display
+				time.sleep(t0 - (1 / self.framerate))  # Wait remaining frametime
 
 
 # Run swanky demo when script is run on its own
@@ -176,10 +176,9 @@ def demo():
 		fv = FakeVision([FakeMarker(*x) for x in markers])
 		draw_arena(screen, s, fv)
 
-		# draw_robot(s.robot_pos, s.robot_rot, [FakeMarker(*x) for x in markers])
 		draw_robot(screen, s, fv)
 		text = msg_font.render("{:.2f}s".format(s.elapsed_time()), True, BLACK)
-		screen.blit(text, (25, 25))  # (text.get_width() // 2, text.get_height() // 2))
+		screen.blit(text, (25, 25))
 		pygame.display.flip()
 		time.sleep(delay)
 
@@ -199,7 +198,7 @@ def demo():
 	time.sleep(1)
 
 	for i in range(200):
-		s.robot_pos = s.robot_pos + rgslib.trig.to_cartesian_degrees(s.robot_rot, 3.5) #(s.robot_pos[0] + 3.5 * np.sin(s.robot_rot / (180 / np.pi)), s.robot_pos[1] + 3.5 * np.cos(s.robot_rot / (180 / np.pi)))
+		s.robot_pos = s.robot_pos + rgslib.trig.to_cartesian_degrees(s.robot_rot, 3.5)
 		full_update()
 
 	for i in range(120):
@@ -207,7 +206,7 @@ def demo():
 		full_update()
 
 	for i in range(50):
-		s.robot_pos = s.robot_pos + rgslib.trig.to_cartesian_degrees(s.robot_rot, 3.5) #(s.robot_pos[0] + 3.5 * np.sin(s.robot_rot / (180 / np.pi)), s.robot_pos[1] + 3.5 * np.cos(s.robot_rot / (180 / np.pi)))
+		s.robot_pos = s.robot_pos + rgslib.trig.to_cartesian_degrees(s.robot_rot, 3.5)
 		full_update()
 
 	time.sleep(5)
