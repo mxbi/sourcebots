@@ -20,8 +20,8 @@ RE_PER_DEGREE = 8.50
 # Unit is seconds
 ROTATION_K = 0.14
 
-FAST_MOVE_SPEED = 1
-FAST_ROTATE_SPEED = 0.5
+FAST_MOVE_SPEED = 0.9
+FAST_ROTATE_SPEED = 0.45
 
 VELOCITY_UPDATE_ALPHA = 0.5 # Update rate for velocity (v1 = alpha * d(RE)/dt + (1 -alpha) * v0
 ACTIVE_CORRECTION_ALPHA = 0.05 # Intensity of active correction

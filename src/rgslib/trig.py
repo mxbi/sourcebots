@@ -32,7 +32,7 @@ def angle_radians(vector):
 # Returns the anticlockwise angle between the positive horizontal and the 2d vector, in degrees
 # The returned angle will be in the range [-180, 180]
 def angle_degrees(vector):
-	return angle_degrees(vector) * (180/np.pi)
+	return angle_radians(vector) * (180/np.pi)
 
 
 def magnitude(vector):
@@ -58,7 +58,7 @@ def to_cartesian_radians(theta, r):
 
 # Converts polar co-ordinates (angle from horizontal, magnitude) into a numpy array (x, y)
 def to_cartesian_degrees(theta, r):
-	return to_cartesian_degrees(theta * (np.pi/180), r)
+	return to_cartesian_radians(theta * (np.pi/180), r)
 
 
 # Converts numpy array (x, y) into polar co-ordinates (angle from horizontal, magnitude)

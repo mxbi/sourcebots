@@ -1,5 +1,6 @@
 import numpy as np
 import time
+from robot import COAST
 from collections import defaultdict
 
 from . import trig
@@ -13,7 +14,6 @@ class MotionController:
 		self.r = robot
 		self.arduino = self.r.servo_board
 
-		self.reset_state()
 		self._update_re()
 
 		self.barrier_raised = False
@@ -23,8 +23,8 @@ class MotionController:
 			print('[MotionController][WARN] No GameState passed to MotionController, functionality will be reduced')
 
 	# On destruction, set speed to 0
-	def __del__(self, robot):
-		self.speed = 0
+	def __del__(self):
+		self.r.speed = 0
 
 	# Update the rotary encoder time
 	def update_re(self):
@@ -57,17 +57,9 @@ class MotionController:
 	def speed(self):
 		return self.mleft, self.mright
 
-	@property
-	def rot(self):
-		return normalise_angle_degrees(self._rot)
-
-	@rot.setter
-	def rot(self, val):
-		self._rot = val
-
 	@speed.setter  # Dark magic, when "self.speed = 1" is called, update both motors
 	def speed(self, speed):
-		if hasattr(speed, '__len__'):
+		if hasattr(speed, '__len__') and speed != COAST:
 			if len(speed) == 2:  # Allow vectors
 				self.r.motor_board.m0, self.r.motor_board.m1 = speed
 			else:
@@ -75,41 +67,18 @@ class MotionController:
 		else:
 			self.r.motor_board.m0, self.r.motor_board.m1 = speed, speed
 
-	# Warning: does not handle pillars
-	def move_to(self, target_pos):
-		# Where we currently are
-		current_pos, current_rot = self.gamestate.robot_pos, self.gamestate.robot_rot
-
-		# How we need to move
-		motion = target_pos - current_pos
-
-		# Which way we need to be facing
-		target_rot, distance = trig.to_polar_degrees(motion)
-
-		# How much we need to turn to face that direction
-		angle = trig.normalise_angle_degrees(target_rot - current_rot)
-
-		# angle is anticlockwise, rotate accepts clockwise, so -
-		self.rotate(-angle)
-		self.move(distance)
-
 	def _aminusb(self, arr):
 		return arr[0] - arr[1]
 
-	def reset_state(self):
-		self.pos = np.zeros(2)
-		# rot is degrees anticlockwise from the positive x axis
-		self.rot = np.float64(0)
-
 	def open_barrier(self):
-		self.arduino.direct_command('servo', 180, 0)
+		self.arduino.direct_command('servo', 130, 0)
 		self.barrier_raised = True
 
 	def close_barrier(self):
-		self.arduino.direct_command('servo', 97, 0)
+		self.arduino.direct_command('servo', 0, 0)
 		self.barrier_raised = False
 
-	def move(self, distance, speed=FAST_MOVE_SPEED, interrupts=[], verbose=1):
+	def move(self, distance, speed=FAST_MOVE_SPEED, interrupts=[], verbose=1, coast=False):
 		"""Accurately move `distance` cm using rotary encoders. Can be negative
 
 		Parameters:
@@ -121,7 +90,9 @@ class MotionController:
 		Returns:
 		dict: logs
 		"""
-
+		
+		initial_pos = self.gamestate.robot_pos
+		
 		logs = defaultdict(list)
 		logs['start_time'] = time.time()
 
@@ -193,9 +164,9 @@ class MotionController:
 					break
 
 			wait_until(end_time)
-			self.speed = 0
+			self.speed = COAST if coast else 0
 		except:
-			self.speed = 0  # If something crashes here, turn off the motors so it doesn't attack the wall
+			self.speed = COAST if coast else 0  # If something crashes here, turn off the motors so it doesn't attack the wall
 			raise
 
 		escape_velocity = 1
@@ -217,7 +188,9 @@ class MotionController:
 			print(message)
 
 		distance = np.mean(logs['distances'][-1])
-		self.pos += trig.to_cartesian_degrees(self.rot, distance)
+		if initial_pos is  None:
+			print(initial_pos)
+			self.gamestate.robot_pos = initial_pos + trig.to_cartesian_degrees(self.gamestate.robot_rot, distance)
 
 		return logs
 
@@ -233,14 +206,24 @@ class MotionController:
 		Returns:
 		dict: logs
 		"""
+		logs = defaultdict(list)
+		
+		initial_rot = self.gamestate.robot_rot
+		
 		sign = np.sign(angle)  # -1 if negative, 1 if positive, 0 if 0
 
 		angles = []
 		self._update_re()
 		initial_re = self.re.copy()
 		velocity = None
+		
+		message = "[RobotController] Rotate {} with motor power {}".format(angle, speed * sign)
+		logs['debug'].append(message)
+		if verbose:
+			print(message)
 
-		if angle < 0.1:
+		if np.abs(angle) < 0.1:
+			print("[MotionController] That was a pretty small angle you just asked me to move")
 			return
 
 		try:
@@ -273,7 +256,8 @@ class MotionController:
 				# How much extra time is necessary to travel this amount?
 				time_remaining = undershoot / velocity
 
-				print('[RobotController] Rotation {}deg Velocity {}deg/s ETA {}s'.format(angle_travelled, velocity, round(time_remaining, 4)))
+				if verbose >= 2:
+					print('[RobotController] Rotation {}deg Velocity {}deg/s ETA {}s'.format(angle_travelled, velocity, round(time_remaining, 4)))
 
 				# When the time remaining is small enough, stop checking rotary encoders and just wait out this extra time
 				# If this time is negative, this can be for two reasons:
@@ -308,6 +292,33 @@ class MotionController:
 		print('[RobotController] Finished - travelled {}deg'.format(angle_travelled))
 
 		# Rotation is anticlockwise whereas angle is clockwise - so subtract
-		self.rot -= angles[-1]
+		if initial_rot is not None:
+			self.gamestate.robot_rot = initial_rot - angles[-1]
 
 		return angles
+
+	# Warning: does not handle pillars
+	def move_to(self, target_pos, rotate_speed=0.25, move_speed=FAST_MOVE_SPEED):
+		epsilon_angle = 3
+				
+		# Where we currently are
+		current_pos, current_rot = self.gamestate.robot_state_blocking()
+		
+		# How we need to move
+		motion = target_pos - current_pos
+		
+		# Which way we need to be facing
+		target_rot, distance = trig.to_polar_degrees(motion)
+		
+		while True:
+			# How much we need to turn to face that direction
+			angle = trig.normalise_angle_degrees(target_rot - current_rot)
+			
+			if np.abs(angle) < epsilon_angle:
+				break
+			
+			self.rotate(-angle, speed=rotate_speed)
+			_, current_rot = self.gamestate.robot_state_blocking()
+		
+		# angle is anticlockwise, rotate accepts clockwise, so -
+		self.move(distance, speed=move_speed)

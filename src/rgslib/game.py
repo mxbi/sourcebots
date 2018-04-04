@@ -1,5 +1,6 @@
 import numpy as np
 import itertools
+import time
 
 from . import trig
 from . import VISION_DISTANCE_FACTOR
@@ -16,9 +17,20 @@ class GameState:
 
 		assert friendly_zone in [0, 1, 2, 3]
 		self.friendly_zone = friendly_zone
+		
+		self.vision_updates = 0
 
 		# self._init_marker_types()
-
+	
+	def friendly_zone_middle(self):
+		zone_dict = {
+			0: np.array([241, 559]),
+			1: np.array([559, 559]),
+			2: np.array([559, 241]),
+			3: np.array([241, 241]),
+		}
+		return zone_dict[self.friendly_zone]
+	
 	def _init_wall_positions(self):
 		# (x, y) of all the wall markers - see https://docs.sourcebots.co.uk/rules.pdf
 		self.wall_positions = {}
@@ -33,6 +45,11 @@ class GameState:
 			self.wall_positions[marker] = (800, y*100)
 		for marker, y in zip([21, 22, 23, 24, 25, 26, 27], [1, 2, 3, 4, 5, 6, 7]):
 			self.wall_positions[marker] = (0, y*100)
+			
+		column_positions = [(400, 619), (419, 600), (400, 582), (382, 600), (600, 419), (619, 400), (600, 382), (582, 400), (400, 219), (419, 200), (400, 182), (382, 200), (200, 419), (219, 400), (200, 382), (182, 400)]
+		
+		for marker, pos in zip(range(28, 44), column_positions):
+			self.wall_positions[marker] = pos
 
 	def get_marker_type(self, marker):
 		friendly_marker = self.marker_id_mapping['TOKEN_ZONE_{}'.format(self.friendly_zone)]
@@ -48,14 +65,25 @@ class GameState:
 	def _update_robot_position(self, position):
 		# Kalman Filter?
 		raise NotImplementedError
-
-	def report_vision_markers(self, markers):
+	
+	def robot_state_blocking(self):
+		initial_count = self.vision_updates
+		
+		while self.vision_updates < initial_count + 2:
+			time.sleep(0.001)
+		
+		return self.robot_pos, self.robot_rot
+	
+	def report_vision_markers(self, markers, verbose=False):
+		self.vision_updates += 1
 		useful_markers = [m for m in markers if self.get_marker_type(m) in ['WALL', 'COLUMN']]
 		if len(useful_markers) == 0:
-			print('[GameState] No anchored markers')
+			if verbose:
+				print('[GameState] No anchored markers')
 			return
 		elif len(useful_markers) == 1:
-			print('[GameState] Only one anchored marker')
+			if verbose:
+				print('[GameState] Only one anchored marker')
 		else:
 			combinations = itertools.combinations(useful_markers, 2)
 			positions = []
@@ -66,7 +94,8 @@ class GameState:
 				rotations.append(rot)
 			pos = np.mean(positions, axis=0)
 			rot = np.mean(rotations, axis=0)
-			print('[GameState] Found {} markers, determined position {} rotation {}'.format(len(useful_markers), pos, rot))
+			if verbose:
+				print('[GameState] Found {} markers, determined position {} rotation {}'.format(len(useful_markers), pos, rot))
 			self.robot_pos = pos
 			self.robot_rot = rot
 			return pos, rot
