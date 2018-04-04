@@ -46,6 +46,7 @@ while True:
 		if len(m) > 0:
 			m0 = sorted(m, key=lambda x: x.spherical.distance_metres)[0]
 			id = m0.id
+			s.box_id = id
 
 			t0 = v.last_marker_time
 
@@ -72,6 +73,7 @@ while True:
 				c.rotate(angle, speed=0.15)
 			if not bad_angle_interrupt():
 				c.move(distance + 60, speed=0.6, interrupts=[bad_angle_interrupt])
+			s.box_id = None
 	else:
 		c.rotate(30)
 		turns_since_box += 1
