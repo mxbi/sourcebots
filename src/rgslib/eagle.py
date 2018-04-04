@@ -83,6 +83,11 @@ def draw_robot(screen, s, vision):
 	vertices = pos + np.dot(rot_matrix, vertices.T).T
 	pygame.draw.aalines(screen, (200, 200, 255), False, vertices, 1)
 
+	# Draw line pointing ahead
+	vertices = np.array([[0, -35], [0, -300]])
+	vertices = pos + np.dot(rot_matrix, vertices.T).T
+	pygame.draw.aaline(screen, (200, 200, 255), *vertices, 1)
+
 	# Draw a triangle and apply the rotation matrix again
 	vertices = np.array([[-10, -25], [0, -35], [10, -25]])
 	vertices = pos + np.dot(rot_matrix, vertices.T).T
