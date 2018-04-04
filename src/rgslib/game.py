@@ -9,7 +9,10 @@ from . import VISION_DISTANCE_FACTOR
 class GameState:
 	"""GameState calculates and stores estimates locations of all objects of interest in the game as well as localising the robot itself."""
 	def __init__(self, friendly_zone):
-		from robot import WALL, COLUMN, TOKEN_ZONE_0, TOKEN_ZONE_1, TOKEN_ZONE_2, TOKEN_ZONE_3
+		try:
+			from robot import WALL, COLUMN, TOKEN_ZONE_0, TOKEN_ZONE_1, TOKEN_ZONE_2, TOKEN_ZONE_3
+		except ImportError:
+			from .game_specific import WALL, COLUMN, TOKEN_ZONE_0, TOKEN_ZONE_1, TOKEN_ZONE_2, TOKEN_ZONE_3
 		self.marker_id_mapping = {'WALL': WALL, 'COLUMN': COLUMN, 'TOKEN_ZONE_0': TOKEN_ZONE_0, 'TOKEN_ZONE_1': TOKEN_ZONE_1, 'TOKEN_ZONE_2': TOKEN_ZONE_2, 'TOKEN_ZONE_3': TOKEN_ZONE_3}
 		self._init_wall_positions()
 		self.robot_pos = [None, None]
