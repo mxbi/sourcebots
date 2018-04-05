@@ -25,7 +25,7 @@ class VisionController:
 		# TODO: Gracefully stop this thread on user request or object destruction
 		
 	def __del__(self):
-		self.stop_thread = 1
+		self.thread.stop = 1
 
 	def markers_semiblocking(self, time_threshold=None):
 		"""Wait until the current see() call has finished and return that. Note that the photo may have been taken before markers_semiblocking was called.
@@ -62,7 +62,7 @@ class MarkerThread(threading.Thread):
 	def run(self):
 		vision_controller = self.vision_controller
 		camera = vision_controller.camera
-		while not self.vision_controller.stop_thread:
+		while not self.stop:
 			t0 = time.time()
 
 			vision_controller.markers = camera.see()
