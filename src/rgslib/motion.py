@@ -92,7 +92,7 @@ class MotionController:
 		dict: logs
 		"""
 		
-		initial_pos = self.gamestate.robot_pos
+		initial_pos = self.gamestate.robot_pos if self.gamestate is not None else None
 		
 		logs = defaultdict(list)
 		logs['start_time'] = time.time()
@@ -209,9 +209,9 @@ class MotionController:
 		dict: logs
 		"""
 		logs = defaultdict(list)
-		
-		initial_rot = self.gamestate.robot_rot
-		
+
+		initial_rot = self.gamestate.robot_rot if self.gamestate is not None else None
+
 		sign = np.sign(angle)  # -1 if negative, 1 if positive, 0 if 0
 
 		angles = []
