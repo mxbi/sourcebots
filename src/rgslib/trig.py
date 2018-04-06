@@ -69,3 +69,19 @@ def to_polar_radians(vector):
 # Converts numpy array (x, y) into polar co-ordinates (angle from horizontal, magnitude)
 def to_polar_degrees(vector):
 	return angle_degrees(vector), magnitude(vector)
+
+
+# Whether or not one line crosses the other.
+# Lines cross only if one line actually passes through the other, such that the points of one line lie either side
+# of the other line. Therefore, if both lines are equal or otherwise co-linear, this will return false. Similarly, if
+# one end of line1 is located on line0, this will return False.
+#
+# Both arguments should be a pair of numpy arrays that represent points.
+def crosses(line0, line1):
+	a, b = line0
+	c, d = line1
+
+	ab_crosses_cd = np.sign(np.cross((a - c), (d - c))) == - np.sign(np.cross((b - c), (d - c))) != 0
+	cd_crosses_ab = np.sign(np.cross((d - a), (b - a))) == - np.sign(np.cross((c - a), (b - a))) != 0
+
+	return ab_crosses_cd and cd_crosses_ab
