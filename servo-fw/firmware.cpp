@@ -37,9 +37,13 @@ void setup() {
   Serial.begin(9600);
   Serial.setTimeout(5);
 
+  // barrier pin
   pinMode(9, OUTPUT);
   barrierServo.attach(9);
   barrierServo.write(97);
+
+  // ultrasound pin
+  pinMode(10, OUTPUT);
 
   Serial.write("# booted\n");
 }
@@ -88,7 +92,7 @@ static CommandError servo(int commandId, String argument) {
   String positionArg = pop_option(argument);
   String uselessArg = pop_option(argument);
 
-  if (argument.length() || !servoArg.length() || !uselessArg.length()) {
+  if (argument.length() || !positionArg.length() || !uselessArg.length()) {
     return COMMAND_ERROR("servo takes exactly two arguments");
   }
 
@@ -238,13 +242,13 @@ static void quickSort(float arr[], int left, int right) {
 }
 
 static float getMedian(float arr[], int n) {
-  quickSort(arr, 0, n);
+  quickSort(arr, 0, n-1);
   return arr[n/2];
 }
 
 static float read_us(int triggerPin, int echoPin) {
   // Reset trigger pin.
-  pinMode(triggerPin, OUTPUT);
+  // pinMode(triggerPin, OUTPUT);
   digitalWrite(triggerPin, LOW);
   delayMicroseconds(2);
 
@@ -255,7 +259,7 @@ static float read_us(int triggerPin, int echoPin) {
 
   // Set echo pin to input now (we don't do it earlier, since it's allowable
   // for triggerPin and echoPin to be the same pin).
-  pinMode(echoPin, INPUT);
+  // pinMode(echoPin, INPUT);
 
   // Read return pulse.
   float duration = (float) pulseIn(echoPin, HIGH);       // In microseconds.
@@ -265,25 +269,29 @@ static float read_us(int triggerPin, int echoPin) {
 
 // Read three times on arduino and return median
 static CommandError fast_read_ultrasound(int commandId, String argument) {
-  String triggerPinStr = pop_option(argument);
-  String echoPinStr = pop_option(argument);
+  // String triggerPinStr = pop_option(argument);
+  // String echoPinStr = pop_option(argument);
 
-  if (argument.length() || !triggerPinStr.length() || !echoPinStr.length()) {
-    return COMMAND_ERROR("need exactly two arguments: <trigger-pin> <echo-pin>");
-  }
+  // triggerPinStr = "10";
+  // echoPinStr = "11";
+  //
+  // if (argument.length() || !triggerPinStr.length() || !echoPinStr.length()) {
+  //   return COMMAND_ERROR("need exactly two arguments: <trigger-pin> <echo-pin>");
+  // }
 
-  int triggerPin = triggerPinStr.toInt();
-  int echoPin = echoPinStr.toInt();
+  int triggerPin = 10;
+  int echoPin = 11;
 
-  const int readings = 3; // Must be odd for median
-  float distances[readings] = { 0.0 };
+  // const int readings = 3; // Must be odd for median
+  // float distances[readings] = { 0.0 };
+  //
+  // for (int i=0; i<readings; i++) {
+  //   float value = read_us(triggerPin, echoPin);
+  //   distances[i] = value;
+  // }
 
-  for (int i=0; i<readings; i++) {
-    float value = read_us(triggerPin, echoPin);
-    distances[i] = value;
-  }
-
-  float distance = getMedian(distances, readings);
+  // float distance = getMedian(distances, readings);
+  float distance = read_us(triggerPin, echoPin);
 
   distance = constrain(distance, 0.0, (float) UINT_MAX); // Ensure that the next line won't overflow.
   unsigned int distanceInt = (unsigned int) distance;
@@ -303,7 +311,7 @@ static CommandError read_rotary_encoders(int commandId, String argument) {
   return OK;
 }
 
-static CommandError is_switch_pressed(int commandId, String argument) {  
+static CommandError is_switch_pressed(int commandId, String argument) {
   serialWrite(commandId, '>', String(switchPressed));
   switchPressed = false;
   return OK;
