@@ -4,6 +4,7 @@ import pygame
 import time
 import numpy as np
 import threading
+import traceback
 
 WHITE = np.array((255, 255, 255))
 BLACK = np.array((0, 0, 0))
@@ -19,7 +20,7 @@ def box(c, size):
 
 def draw_arena(screen, s, vision):
 	font = pygame.font.SysFont("roboto", 20)
-	bold_font = pygame.font.SysFont("roboto", 20, bold=True)
+	bold_font = pygame.font.SysFont("roboto", 28, bold=True)
 
 	pygame.draw.rect(screen, WHITE, pygame.Rect(0, 0, *DISPLAY_SIZE))
 	pygame.draw.lines(screen, BLACK, True, [(100, 100), (100, 900), (900, 900), (900, 100)])
@@ -122,23 +123,28 @@ class EagleThread(threading.Thread):
 		done = False
 
 	def run(self):
+			c = WHITE
 			while True:
 				t0 = time.time()
 				for event in pygame.event.get():
 					if event.type == pygame.QUIT:
 						break
+				try:
+					draw_arena(self.screen, self.gamestate, self.vision)
+					draw_robot(self.screen, self.gamestate, self.vision)
+					pygame.draw.polygon(self.screen, c, box((0, 0), 20))
 
-				draw_arena(self.screen, self.gamestate, self.vision)
-				draw_robot(self.screen, self.gamestate, self.vision)
+					# Print elapsed time
+					msg_font = pygame.font.SysFont("roboto", 36)
+					text = msg_font.render("{:.2f}s".format(self.gamestate.elapsed_time()), True, BLACK)
+					self.screen.blit(text, (25, 25))
 
-				# Print elapsed time
-				msg_font = pygame.font.SysFont("roboto", 36)
-				text = msg_font.render("{:.2f}s".format(self.gamestate.elapsed_time()), True, BLACK)
-				self.screen.blit(text, (25, 25))
-
-				pygame.display.flip()  # Swap frame buffers, print current buffer to display
-				time.sleep(t0 - (1 / self.framerate))  # Wait remaining frametime
-
+					pygame.display.flip()  # Swap frame buffers, print current buffer to display
+					c = BLACK if (c == WHITE).all() else WHITE
+					time.sleep(max(0, 1 / self.framerate - (time.time() - t0)))  # Wait remaining frametime
+				except Exception as e:
+					print(traceback.format_exc())
+					print('Failed to render frame', e)
 
 # Run swanky demo when script is run on its own
 def demo():

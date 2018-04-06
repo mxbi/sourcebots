@@ -58,6 +58,7 @@ class MarkerThread(threading.Thread):
 	def __init__(self, vision_controller):
 		self.vision_controller = vision_controller
 		threading.Thread.__init__(self)
+		self.stop = 0
 
 	def run(self):
 		vision_controller = self.vision_controller

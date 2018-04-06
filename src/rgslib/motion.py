@@ -1,5 +1,6 @@
 import numpy as np
 import time
+from robot import COAST
 from collections import defaultdict
 
 from . import trig
@@ -7,7 +8,6 @@ from . import nostdout, wait_until
 from . import RE_LATENCY, FAST_MOVE_SPEED, RE_MOVE_OFFSET, RE_PER_CM, VELOCITY_UPDATE_ALPHA, ACTIVE_CORRECTION_ALPHA, \
 	RE_PREDICT_TIME, FAST_ROTATE_SPEED, RE_PER_DEGREE, ROTATION_K
 
-COAST = "coast"
 
 class MotionController:
 	def __init__(self, robot, gamestate=None):
@@ -65,13 +65,14 @@ class MotionController:
 			else:
 				raise ValueError("Tried setting speed with {} len {} ????".format(speed, len(speed)))
 		else:
+			print('Set speed to {}'.format(speed))
 			self.r.motor_board.m0, self.r.motor_board.m1 = speed, speed
 
 	def _aminusb(self, arr):
 		return arr[0] - arr[1]
 
 	def open_barrier(self):
-		self.arduino.direct_command('servo', 130, 0)
+		self.arduino.direct_command('servo', 90, 0)
 		self.barrier_raised = True
 
 	def close_barrier(self):
@@ -108,7 +109,7 @@ class MotionController:
 		if verbose:
 			print(message)
 
-		if distance <= RE_MOVE_OFFSET:
+		if np.abs(distance) <= RE_MOVE_OFFSET:
 			return logs
 
 		try:
@@ -191,6 +192,7 @@ class MotionController:
 		if initial_pos is  None:
 			print(initial_pos)
 			self.gamestate.robot_pos = initial_pos + trig.to_cartesian_degrees(self.gamestate.robot_rot, distance)
+			self.gamestate.vision_waits = 1
 
 		return logs
 
@@ -294,6 +296,7 @@ class MotionController:
 		# Rotation is anticlockwise whereas angle is clockwise - so subtract
 		if initial_rot is not None:
 			self.gamestate.robot_rot = initial_rot - angles[-1]
+			self.gamestate.vision_waits = 1
 
 		return angles
 
@@ -317,6 +320,7 @@ class MotionController:
 			if np.abs(angle) < epsilon_angle:
 				break
 			
+			print(target_rot, current_rot, target_rot - current_rot, angle)
 			self.rotate(-angle, speed=rotate_speed)
 			_, current_rot = self.gamestate.robot_state_blocking()
 		

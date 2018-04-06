@@ -25,6 +25,7 @@ class GameState:
 		self.box_id = None
 
 		self.init_time = time.time()
+		self.vision_waits = 0
 
 		# self._init_marker_types()
 	def _init_wall_positions(self):
@@ -73,7 +74,11 @@ class GameState:
 		marker_distance = np.abs(z1 - z0)
 
 		# The line that passes through m0 and m1 makes an angle of alpha with the horizontal
-		alpha = np.arccos((r0 ** 2 + marker_distance ** 2 - r1 ** 2) / (2 * r0 * marker_distance)) * phi_sign
+		cosalpha = (r0 ** 2 + marker_distance ** 2 - r1 ** 2) / (2 * r0 * marker_distance)
+		if np.abs(cosalpha) > 1:
+			print('[GameState][WARN] cosalpha has invalid value {}', cosalpha)
+			cosalpha = np.clip(cosalpha, -1, 1)
+		alpha = np.arccos(cosalpha) * phi_sign
 
 		# The position of the robot as a complex number
 		z = z0 + r0 * np.exp(alpha * 1j) * (z1 - z0) / marker_distance
@@ -119,6 +124,10 @@ class GameState:
 		return self.robot_pos, self.robot_rot
 	
 	def report_vision_markers(self, markers, verbose=False):
+		if self.vision_waits:
+			self.vision_waits -= 1
+			return
+		
 		self.vision_updates += 1
 		useful_markers = [m for m in markers if self.get_marker_type(m) in ['WALL', 'COLUMN']]
 		if len(useful_markers) == 0:
@@ -128,6 +137,9 @@ class GameState:
 		elif len(useful_markers) == 1:
 			if verbose:
 				print('[GameState] Only one anchored marker')
+		elif len(useful_markers) == 2:
+			if verbose:
+				print('[GameState] Only two anchored markers')
 		else:
 			combinations = itertools.combinations(useful_markers, 2)
 			positions = []
