@@ -1,4 +1,3 @@
-//#define ENCODER_OPTIMIZE_INTERRUPTS
 #include <Encoder.h>
 #include <Servo.h>
 
@@ -97,9 +96,6 @@ static CommandError servo(int commandId, String argument) {
   }
 
   auto positionInt = positionArg.toInt();
-//  if (servo < 0 || servo > 180) {
-//    return COMMAND_ERROR("Position out of range");
-//  }
   barrierServo.write(positionInt);
   return OK;
 }
@@ -210,45 +206,11 @@ static CommandError ultrasound_read(int commandId, String argument) {
 
 /////////////////// CUSTOM FUNCTIONS ////////////////////
 
-static void quickSort(float arr[], int left, int right) {
-  int i = left, j = right;
-  float tmp;
-  float pivot = arr[(left + right) / 2];
+static float read_us() {
+  int triggerPin = 10;
+  int echoPin = 11;
 
-  /* partition */
-  while (i <= j) {
-    while (arr[i] < pivot) {
-      i++;
-    }
-    while (arr[j] > pivot) {
-      j--;
-    }
-    if (i <= j) {
-      tmp = arr[i];
-      arr[i] = arr[j];
-      arr[j] = tmp;
-      i++;
-      j--;
-    };
-  }
-
-  /* recursion */
-  if (left < j) {
-        quickSort(arr, left, j);
-  }
-  if (i < right) {
-    quickSort(arr, i, right);
-  }
-}
-
-static float getMedian(float arr[], int n) {
-  quickSort(arr, 0, n-1);
-  return arr[n/2];
-}
-
-static float read_us(int triggerPin, int echoPin) {
   // Reset trigger pin.
-  // pinMode(triggerPin, OUTPUT);
   digitalWrite(triggerPin, LOW);
   delayMicroseconds(2);
 
@@ -257,48 +219,10 @@ static float read_us(int triggerPin, int echoPin) {
   delayMicroseconds(10);
   digitalWrite(triggerPin, LOW);
 
-  // Set echo pin to input now (we don't do it earlier, since it's allowable
-  // for triggerPin and echoPin to be the same pin).
-  // pinMode(echoPin, INPUT);
-
   // Read return pulse.
   float duration = (float) pulseIn(echoPin, HIGH);       // In microseconds.
 
   return duration * ULTRASOUND_COEFFICIENT; // distance in millimetres
-}
-
-// Read three times on arduino and return median
-static CommandError fast_read_ultrasound(int commandId, String argument) {
-  // String triggerPinStr = pop_option(argument);
-  // String echoPinStr = pop_option(argument);
-
-  // triggerPinStr = "10";
-  // echoPinStr = "11";
-  //
-  // if (argument.length() || !triggerPinStr.length() || !echoPinStr.length()) {
-  //   return COMMAND_ERROR("need exactly two arguments: <trigger-pin> <echo-pin>");
-  // }
-
-  int triggerPin = 10;
-  int echoPin = 11;
-
-  // const int readings = 3; // Must be odd for median
-  // float distances[readings] = { 0.0 };
-  //
-  // for (int i=0; i<readings; i++) {
-  //   float value = read_us(triggerPin, echoPin);
-  //   distances[i] = value;
-  // }
-
-  // float distance = getMedian(distances, readings);
-  float distance = read_us(triggerPin, echoPin);
-
-  distance = constrain(distance, 0.0, (float) UINT_MAX); // Ensure that the next line won't overflow.
-  unsigned int distanceInt = (unsigned int) distance;
-
-  serialWrite(commandId, '>', String(distanceInt));
-
-  return OK;
 }
 
 static CommandError read_rotary_encoders(int commandId, String argument) {
@@ -317,6 +241,21 @@ static CommandError is_switch_pressed(int commandId, String argument) {
   return OK;
 }
 
+static CommandError read_us_and_rotary_encoders(int commandId, String argument) {
+  long leftCount, rightCount;
+  leftCount = encoderLeft.read();
+  rightCount = encoderRight.read();
+
+  float ultrasound_reading;
+  ultrasound_reading = read_us();
+
+  serialWrite(commandId, '>', String(leftCount));
+  serialWrite(commandId, '>', String(rightCount));
+  serialWrite(commandId, '>', String(ultrasound_reading));
+
+  return OK;
+}
+
 ///////////////////// END CUSTOM FUNCTIONS ////////////////////////
 
 static CommandError get_version(int commandId, String argument) {
@@ -332,7 +271,7 @@ static const CommandHandler commands[] = {
   CommandHandler("gpio-write", &write_pin, "set output from GPIO pin"),
   CommandHandler("gpio-read", &read_pin, "get digital input from GPIO pin"),
   CommandHandler("analogue-read", &analogue_read, "get all analogue inputs"),
-  CommandHandler("u", &fast_read_ultrasound, "read an ultrasound sensor <trigger-pin> <echo-pin>"),
+  CommandHandler("u", &read_us_and_rotary_encoders, "read both ultrasound and rotart encoders, no args"),
   CommandHandler("ultrasound_read", &ultrasound_read, "read an ultrasound sensor <trigger-pin> <echo-pin>"),
   CommandHandler("r", &read_rotary_encoders, "read both rotary encoder counts, no arguments"),
   CommandHandler("send_help", &is_switch_pressed, "find out if switch has been pressed"), // do not work; switch, ms, sh, m, p, s
