@@ -65,7 +65,7 @@ while True:
 						return 0
 
 			angle = m0.spherical.rot_y_degrees
-			distance = m0.spherical.distance_metres * 0.881 * 100
+			distance = m0.spherical.distance_metres * lib.VISION_DISTANCE_FACTOR
 			print('Found box, angle/distance:', angle, distance)
 			if np.abs(angle) > 5:
 				c.rotate(angle, speed=0.25)
