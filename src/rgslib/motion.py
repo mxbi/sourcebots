@@ -189,8 +189,7 @@ class MotionController:
 			print(message)
 
 		distance = np.mean(logs['distances'][-1])
-		if initial_pos is  None:
-			print(initial_pos)
+		if initial_pos is not None:
 			self.gamestate.robot_pos = initial_pos + trig.to_cartesian_degrees(self.gamestate.robot_rot, distance)
 			self.gamestate.vision_waits = 1
 
