@@ -58,7 +58,7 @@ while True:
 				else:
 					m0 = id_markers[0]
 					angle = m0.spherical.rot_y_degrees
-					distance = m0.spherical.distance_metres * 100
+					distance = m0.spherical.distance_metres * lib.VISION_DISTANCE_FACTOR
 					if np.abs(angle) > np.abs(np.arctan2(20, distance))*(180 / np.pi) + 1 and np.abs(angle) > 5 and v.last_marker_time > t0:
 						return 'ANGLE TOO WIDE {}'.format(angle)
 					else:
