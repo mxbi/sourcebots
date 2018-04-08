@@ -72,16 +72,15 @@ def to_polar_degrees(vector):
 
 
 # Whether or not one line crosses the other.
-# Lines cross only if one line actually passes through the other, such that the points of one line lie either side
-# of the other line. Therefore, if both lines are equal or otherwise co-linear, this will return false. Similarly, if
-# one end of line1 is located on line0, this will return False.
+# This does not check for co-linearity: if two lines are parallel, this will always return False, regardless of whether
+# they intercept.
 #
 # Both arguments should be a pair of numpy arrays that represent points.
 def crosses(line0, line1):
 	a, b = line0
 	c, d = line1
 
-	ab_crosses_cd = np.sign(np.cross((a - c), (d - c))) == - np.sign(np.cross((b - c), (d - c))) != 0
-	cd_crosses_ab = np.sign(np.cross((d - a), (b - a))) == - np.sign(np.cross((c - a), (b - a))) != 0
+	ab_crosses_cd = np.sign(np.cross((a - c), (d - c))) != - np.sign(np.cross((b - c), (d - c)))
+	cd_crosses_ab = np.sign(np.cross((d - a), (b - a))) != - np.sign(np.cross((c - a), (b - a)))
 
 	return ab_crosses_cd and cd_crosses_ab
