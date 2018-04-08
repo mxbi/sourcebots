@@ -341,5 +341,10 @@ class MotionController:
 
 			self.move(distance, speed=move_speed)
 		else:
-			# uhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
-			pass
+			first_bad_zone = bad_zones[0]
+			alternative_route = first_bad_zone.alternative_route(movement_line)
+
+			for start, end in alternative_route:
+				# These may still go through other pillars (though unlikely), but we've stopped it going through at least
+				# one pillar and we'll handle each of the other pillars recursively
+				move_to(end, rotate_speed, move_speed)

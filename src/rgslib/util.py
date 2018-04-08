@@ -21,6 +21,13 @@ class Rectangle:
 
 		self.edges = [self.north_edge, self.east_edge, self.south_edge, self.west_edge]
 
+		self.corner_dict = {
+			self.a: ((self.west_edge, self.north_edge), np.array([-1, 1])),
+			self.b: ((self.north_edge, self.east_edge), np.array([1, 1])),
+			self.c: ((self.east_edge, self.south_edge), np.array([1, -1])),
+			self.d: ((self.south_edge, self.west_edge), np.array([-1, -1])),
+		}
+
 	# Expands the square in all directions by the given amount
 	def expand(self, distance):
 		return Rectangle(self.south - distance, self.north + distance, self.west - distance, self.east + distance)
@@ -31,3 +38,56 @@ class Rectangle:
 	def is_point_inside(self, point):
 		x, y = point
 		return self.west < y < self.east and self.south < x < self.north
+
+	# If the line goes through the rectangle, return an alternate route that avoids this zone
+	# Returns a list of lines that the robot should go through instead
+	def alternative_route(self, line):
+		start, end = line
+
+		# The distance to avoid this zone by
+		pad_distance = 5
+
+		bad_edges = [edge for edge in self.edges if trig.crosses(line, edge)]
+
+		if bad_edges is None:
+			print('[Rectangle][WARN] Calling alternative route with a line that does not go through zone')
+			return [line]
+
+		if len(bad_edges) == 1:
+			print('[Rectangle][WARN] Only one edge crossed but alternative_route called')
+			return [line]
+
+		for corner, ((edge1, edge2), direction) in self.corner_dict:
+			if edge1 in bad_edges and edge2 in bad_edges:
+				# Line goes through two adjacent edges, so if we stay clear of the corner we'll be fine
+				#
+				# Before:
+				#
+				# \   _______
+				#  \ [      ]
+				#   \[      ]
+				#    \      ]
+				#    [\     ]
+				#    [_\____]
+				#       \
+				#        \
+				#         \
+				#          \
+				#
+				# After:
+				#
+				# |   _______
+				# |  [      ]
+				# |  [      ]
+				# |  [      ]
+				# |  [      ]
+				# |  [______]
+				# |
+				#  \
+				#   \
+				#    \
+				middle = corner + direction * pad_distance
+				return [(start, middle), (middle, end)]
+
+		# If we get here, that means the line goes through opposite edges
+		# uhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
