@@ -3,6 +3,7 @@ import itertools
 import time
 
 from . import trig
+from . import util
 from . import VISION_DISTANCE_FACTOR
 
 
@@ -27,7 +28,20 @@ class GameState:
 		self.init_time = time.time()
 		self.vision_waits = 0
 
-		# self._init_marker_types()
+		self.pillars = [
+			util.Rectangle(381, 419, 181, 219),
+			util.Rectangle(181, 219, 381, 419),
+			util.Rectangle(381, 419, 581, 619),
+			util.Rectangle(581, 619, 381, 419),
+		]
+
+		# Minimum distance to avoid the edges of pillars by, in cm
+		min_edge_distance = 15
+		self.zones_to_avoid = [pillar.expand(min_edge_distance) for pillar in self.pillars]
+
+		# Edges of zones we want to avoid
+		self.edges_to_avoid = [edge for pillar in self.pillars for edge in pillar.edges]
+
 	def _init_wall_positions(self):
 		# (x, y) of all the wall markers - see https://docs.sourcebots.co.uk/rules.pdf
 		self.wall_positions = {}

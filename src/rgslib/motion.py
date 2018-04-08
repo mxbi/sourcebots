@@ -305,25 +305,39 @@ class MotionController:
 
 		# Where we currently are
 		current_pos, current_rot = self.gamestate.robot_state_blocking()
-		
-		# How we need to move
-		motion = target_pos - current_pos
-		
-		# Which way we need to be facing
-		target_rot, distance = trig.to_polar_degrees(motion)
-		
-		while True:
-			# How much we need to turn to face that direction
-			angle = trig.normalise_angle_degrees(target_rot - current_rot)
 
-			# Keep turning until we are within a certain range of the target
-			if np.abs(angle) < epsilon_angle:
-				break
+		movement_line = (current_pos, target_pos)
+		bad_edges = [edge for edge in self.gamestate.edges_to_avoid if trig.crosses(edge, movement_line)]
 
-			# angle is anticlockwise, rotate accepts clockwise, so -
-			self.rotate(-angle, speed=rotate_speed)
+		# If we never hit any pillars
+		if not bad_edges:
+			# How we need to move
+			motion = target_pos - current_pos
 
-			# Update our rotation if we see any more markers
-			_, current_rot = self.gamestate.robot_state_blocking()
-		
-		self.move(distance, speed=move_speed)
+			# Which way we need to be facing
+			target_rot, distance = trig.to_polar_degrees(motion)
+
+			while True:
+				# How much we need to turn to face that direction
+				angle = trig.normalise_angle_degrees(target_rot - current_rot)
+
+				# Keep turning until we are within a certain range of the target
+				if np.abs(angle) < epsilon_angle:
+					break
+
+				# angle is anticlockwise, rotate accepts clockwise, so -
+				self.rotate(-angle, speed=rotate_speed)
+
+				# Update our rotation if we see any more markers
+				_, current_rot = self.gamestate.robot_state_blocking()
+
+			self.move(distance, speed=move_speed)
+		else:
+			if len(bad_edges) % 2 == 1:
+				# I think if this happens we'll end up in a pillar?
+				# That seems like a bad idea to me
+				# TODO: handle this
+				pass
+			else:
+				# uhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+				pass
