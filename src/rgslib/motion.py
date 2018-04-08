@@ -79,6 +79,7 @@ class MotionController:
 		self.arduino.direct_command('servo', 0, 0)
 		self.barrier_raised = False
 
+
 	def move(self, distance, speed=FAST_MOVE_SPEED, interrupts=[], verbose=1, coast=False):
 		"""Accurately move `distance` cm using rotary encoders. Can be negative
 
@@ -86,14 +87,15 @@ class MotionController:
 		distance: cms to move
 		speed (default: {FAST_MOVE_SPEED}): Base motor power to move
 		interrupts: List of functions to call in a loop while moving - if any of the functions return a non-zero exit code the robot will stop.
+		coast (default: False): Ramp down at the end of the movement instead of suddenly braking. Useful when going really fast.
 		verbose (default: 1): Verbosity level. 0->No messages, 1->Info messages, 2->All debug messages
 
 		Returns:
 		dict: logs
 		"""
-		
+
 		initial_pos = self.gamestate.robot_pos if self.gamestate is not None else None
-		
+
 		logs = defaultdict(list)
 		logs['start_time'] = time.time()
 
@@ -104,7 +106,7 @@ class MotionController:
 		initial_re = self.re.copy()
 		velocity = None
 
-		message = "[RobotController] Move {} with motor power {}".format(distance, speed * sign)
+		message = "[MotionController] Move {} with motor power {}".format(distance, speed * sign)
 		logs['debug'].append(message)
 		if verbose:
 			print(message)
@@ -153,7 +155,7 @@ class MotionController:
 
 				time_remaining = (distance - total_distance.mean()) / velocity.mean()
 
-				message = '[RobotController] Distance {}cm Velocity {}cm/s ETA {}s'.format(total_distance, velocity, round(time_remaining, 4))
+				message = '[MotionController] Distance {}cm Velocity {}cm/s ETA {}s'.format(total_distance, velocity, round(time_remaining, 4))
 				logs['debug'].append(message)
 				if verbose >= 2:
 					print(message)
@@ -183,7 +185,7 @@ class MotionController:
 			re_time_delta = self.re_time - old_re_time
 			v = (self.re - old_re) / RE_PER_CM / re_time_delta
 
-		message = '[RobotController] Finished - travelled {}cm'.format(distance_travelled)
+		message = '[MotionController] Finished - travelled {}cm'.format(distance_travelled)
 		logs['debug'].append(message)
 		if verbose:
 			print(message)
@@ -194,6 +196,7 @@ class MotionController:
 			self.gamestate.vision_waits = 1
 
 		return logs
+
 
 	# Turns the angle in degrees, where clockwise is positive and anticlockwise is negative
 	def rotate(self, angle, speed=FAST_ROTATE_SPEED, verbose=1):
@@ -217,14 +220,14 @@ class MotionController:
 		self._update_re()
 		initial_re = self.re.copy()
 		velocity = None
-		
-		message = "[RobotController] Rotate {} with motor power {}".format(angle, speed * sign)
+
+		message = "[MotionController] Rotate {} with motor power {}".format(angle, speed * sign)
 		logs['debug'].append(message)
 		if verbose:
 			print(message)
 
 		if np.abs(angle) < 0.1:
-			print("[MotionController] That was a pretty small angle you just asked me to move")
+			print("[MotionController][WARN] That was a pretty small angle you just asked me to move")
 			return
 
 		try:
@@ -258,7 +261,7 @@ class MotionController:
 				time_remaining = undershoot / velocity
 
 				if verbose >= 2:
-					print('[RobotController] Rotation {}deg Velocity {}deg/s ETA {}s'.format(angle_travelled, velocity, round(time_remaining, 4)))
+					print('[MotionController] Rotation {}deg Velocity {}deg/s ETA {}s'.format(angle_travelled, velocity, round(time_remaining, 4)))
 
 				# When the time remaining is small enough, stop checking rotary encoders and just wait out this extra time
 				# If this time is negative, this can be for two reasons:
@@ -290,7 +293,7 @@ class MotionController:
 			angle_travelled = self._aminusb(self.re - initial_re) / RE_PER_DEGREE
 			angles.append(angle_travelled)
 
-		print('[RobotController] Finished - travelled {}deg'.format(angle_travelled))
+		print('[MotionController] Finished - travelled {}deg'.format(angle_travelled))
 
 		# Rotation is anticlockwise whereas angle is clockwise - so subtract
 		if initial_rot is not None:
@@ -299,19 +302,36 @@ class MotionController:
 
 		return angles
 
+
 	# Warning: does not handle pillars
-	def move_to(self, target_pos, rotate_speed=0.25, move_speed=FAST_MOVE_SPEED):
-		epsilon_angle = 3
+	def move_to(self, target_pos, rotate_speed=0.25, move_speed=FAST_MOVE_SPEED, coast=False, verbose=1):
+		"""Move to precise co-ordinates. Will dynamically avoid obstacles
+
+		Parameters:
+		target_pos: Co-ordinates to move to
+		rotate_speed (default: 0.25): Base motor power to use when rotating
+		move_speed (default: {FAST_MOVE_SPEED}): Base motor power to use when moving
+		coast (default: True): Whether to slowly stop at the end - note this leads to overshot distances but avoids sudden breaking. Passed through to move()
+		verbose (default: 1): Verbosity level. 0->No messages, 1->Info messages, 2->All debug messages
+
+		Returns:
+		dict: logs
+		"""
+		target_pos = np.array(target_pos)
+		epsilon_angle = 3 # TODO: Improve this angle, maybe using atan2 to figure out acceptable distance
+
+		message = "[MotionController.move_to] Going to {} with speeds {}/{}".format(target_pos)
+		if verbose:
+			print(message)
 
 		# Where we currently are
 		current_pos, current_rot = self.gamestate.robot_state_blocking()
 
-		bad_end = any(pillar.is_point_inside(target_pos) for pillar in self.gamestate.pillars)
+		wall_eps = 25 # Prevent moving within 25cm of a wall using this method
+		bad_end = any(pillar.is_point_inside(target_pos) for pillar in self.gamestate.pillars) or any(c > (800 - wall_eps) or c < (wall_eps) for c in target_pos)
 
 		if bad_end:
-			# If this happens we'll end up in a pillar?
-			# That seems like a bad idea to me
-			# TODO: handle this
+			print('[MotionController.move_to][ERROR] Illegal position {} requested in move_to(), ignoring.'.format(target_pos))
 			pass
 
 		movement_line = (current_pos, target_pos)
@@ -344,7 +364,13 @@ class MotionController:
 			first_bad_zone = bad_zones[0]
 			alternative_route = first_bad_zone.alternative_route(movement_line)
 
+			if verbose:
+				print('[MotionController.move_to] No direct path in move_to(), taking detour:', alternative_route)
 			for start, end in alternative_route:
 				# These may still go through other pillars (though unlikely), but we've stopped it going through at least
 				# one pillar and we'll handle each of the other pillars recursively
-				move_to(end, rotate_speed, move_speed)
+				move_to(end, rotate_speed, move_speed, coast=coast, verbose=verbose)
+
+		message = "[MotionController.move_to] Finished moving to {}, estimated position {}".format(target_pos, self.gamestate.robot_pos)
+		if verbose:
+			print(message)

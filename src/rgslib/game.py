@@ -21,7 +21,7 @@ class GameState:
 
 		assert friendly_zone in [0, 1, 2, 3]
 		self.friendly_zone = friendly_zone
-		
+
 		self.vision_updates = 0
 		self.box_id = None
 
@@ -57,9 +57,9 @@ class GameState:
 			self.wall_positions[marker] = (800, y*100)
 		for marker, y in zip([21, 22, 23, 24, 25, 26, 27], [1, 2, 3, 4, 5, 6, 7]):
 			self.wall_positions[marker] = (0, y*100)
-			
+
 		column_positions = [(400, 619), (419, 600), (400, 582), (382, 600), (600, 419), (619, 400), (600, 382), (582, 400), (400, 219), (419, 200), (400, 182), (382, 200), (200, 419), (219, 400), (200, 382), (182, 400)]
-		
+
 		for marker, pos in zip(range(28, 44), column_positions):
 			self.wall_positions[marker] = pos
 
@@ -132,17 +132,17 @@ class GameState:
 
 	def robot_state_blocking(self):
 		initial_count = self.vision_updates
-		
+
 		while self.vision_updates < initial_count + 2:
 			time.sleep(0.001)
-		
+
 		return self.robot_pos, self.robot_rot
-	
+
 	def report_vision_markers(self, markers, verbose=False):
 		if self.vision_waits:
 			self.vision_waits -= 1
 			return
-		
+
 		self.vision_updates += 1
 		useful_markers = [m for m in markers if self.get_marker_type(m) in ['WALL', 'COLUMN']]
 		if len(useful_markers) == 0:

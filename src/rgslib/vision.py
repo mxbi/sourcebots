@@ -23,7 +23,7 @@ class VisionController:
 		# Start thread which runs forever
 		self.thread = MarkerThread(self).start()
 		# TODO: Gracefully stop this thread on user request or object destruction
-		
+
 	def __del__(self):
 		self.thread.stop = 1
 
