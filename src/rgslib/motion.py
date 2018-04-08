@@ -302,7 +302,7 @@ class MotionController:
 	# Warning: does not handle pillars
 	def move_to(self, target_pos, rotate_speed=0.25, move_speed=FAST_MOVE_SPEED):
 		epsilon_angle = 3
-				
+
 		# Where we currently are
 		current_pos, current_rot = self.gamestate.robot_state_blocking()
 		
@@ -315,13 +315,15 @@ class MotionController:
 		while True:
 			# How much we need to turn to face that direction
 			angle = trig.normalise_angle_degrees(target_rot - current_rot)
-			
+
+			# Keep turning until we are within a certain range of the target
 			if np.abs(angle) < epsilon_angle:
 				break
-			
-			print(target_rot, current_rot, target_rot - current_rot, angle)
+
+			# angle is anticlockwise, rotate accepts clockwise, so -
 			self.rotate(-angle, speed=rotate_speed)
+
+			# Update our rotation if we see any more markers
 			_, current_rot = self.gamestate.robot_state_blocking()
 		
-		# angle is anticlockwise, rotate accepts clockwise, so -
 		self.move(distance, speed=move_speed)
