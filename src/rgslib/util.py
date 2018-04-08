@@ -37,7 +37,7 @@ class Rectangle:
 
 	def is_point_inside(self, point):
 		x, y = point
-		return self.west < y < self.east and self.south < x < self.north
+		return self.west < x < self.east and self.south < y < self.north
 
 	# If the line goes through the rectangle, return an alternate route that avoids this zone
 	# Returns a list of lines that the robot should go through instead
