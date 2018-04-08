@@ -306,11 +306,19 @@ class MotionController:
 		# Where we currently are
 		current_pos, current_rot = self.gamestate.robot_state_blocking()
 
+		bad_end = any(pillar.is_point_inside(target_pos) for pillar in self.gamestate.pillars)
+
+		if bad_end:
+			# If this happens we'll end up in a pillar?
+			# That seems like a bad idea to me
+			# TODO: handle this
+			pass
+
 		movement_line = (current_pos, target_pos)
-		bad_edges = [edge for edge in self.gamestate.edges_to_avoid if trig.crosses(edge, movement_line)]
+		bad_zones = [zone for zone in self.gamestate.zones_to_avoid if zone.is_crossed_by(movement_line)]
 
 		# If we never hit any pillars
-		if not bad_edges:
+		if not bad_zones:
 			# How we need to move
 			motion = target_pos - current_pos
 
@@ -333,11 +341,5 @@ class MotionController:
 
 			self.move(distance, speed=move_speed)
 		else:
-			if len(bad_edges) % 2 == 1:
-				# I think if this happens we'll end up in a pillar?
-				# That seems like a bad idea to me
-				# TODO: handle this
-				pass
-			else:
-				# uhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
-				pass
+			# uhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+			pass
