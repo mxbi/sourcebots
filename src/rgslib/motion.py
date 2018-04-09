@@ -369,7 +369,7 @@ class MotionController:
 			for start, end in alternative_route:
 				# These may still go through other pillars (though unlikely), but we've stopped it going through at least
 				# one pillar and we'll handle each of the other pillars recursively
-				move_to(end, rotate_speed, move_speed, coast=coast, verbose=verbose)
+				self.move_to(end, rotate_speed, move_speed, coast=coast, verbose=verbose)
 
 		message = "[MotionController.move_to] Finished moving to {}, estimated position {}".format(target_pos, self.gamestate.robot_pos)
 		if verbose:

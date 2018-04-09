@@ -1,3 +1,4 @@
+import numpy as np
 from .import trig
 
 
@@ -12,12 +13,12 @@ class Rectangle:
 		self.b = np.array([east, north])
 		self.c = np.array([east, south])
 		self.d = np.array([west, south])
-		self.corners = [a, b, c, d]
+		self.corners = [self.a, self.b, self.c, self.d]
 
-		self.north_edge = a, b
-		self.east_edge = b, c
-		self.south_edge = c, d
-		self.west_edge = d, a
+		self.north_edge = self.a, self.b
+		self.east_edge = self.b, self.c
+		self.south_edge = self.c, self.d
+		self.west_edge = self.d, self.a
 
 		self.edges = [self.north_edge, self.east_edge, self.south_edge, self.west_edge]
 
@@ -45,7 +46,7 @@ class Rectangle:
 		start, end = line
 
 		# The distance to avoid this zone by
-		pad_distance = 5
+		pad_distance = 10
 
 		bad_edges = [edge for edge in self.edges if trig.crosses(line, edge)]
 
@@ -90,4 +91,39 @@ class Rectangle:
 				return [(start, middle), (middle, end)]
 
 		# If we get here, that means the line goes through opposite edges
-		# uhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+
+		# If the line goes through south and north edges
+		if self.north_edge in bad_edges and self.south_edge in bad_edges:
+			_, y0 = start
+			_, y1 = end
+
+			if y1 > y0:
+				# We are going south to north
+				corner0 = self.c
+				corner1 = self.b
+			else:
+				# We are going north to south
+				corner0 = self.b
+				corner1 = self.c
+		else:   # Lines go through east and west edges
+			x0, _ = start
+			x1, _ = end
+
+			if x1 > x0:
+				# We are going east to west
+				corner0 = self.a
+				corner1 = self.b
+			else:
+				# We are going west to east
+				corner0 = self.b
+				corner1 = self.a
+
+		_, pad0 = self.corner_dict[corner0]
+		_, pad1 = self.corner_dict[corner1]
+
+		# Go via the corners
+
+		middle0 = corner0 + pad0
+		middle1 = corner1 + pad1
+
+		return [(start, middle0), (middle0, middle1), (middle1, end)]
