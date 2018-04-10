@@ -38,11 +38,11 @@ void setup() {
   Serial.setTimeout(5);
 
   // barrier setup
-  int initialPosition = 135
+  int initialPosition = 135;
   pinMode(8, OUTPUT);
   pinMode(9, OUTPUT);
   barrierServo1.attach(8);
-  barrierServo1.write(initialPosition);
+  barrierServo1.write(180 - initialPosition);
   barrierServo2.attach(9);
   barrierServo2.write(initialPosition);
 
@@ -103,7 +103,7 @@ static CommandError servo(int commandId, String argument) {
   }
 
   auto positionInt = positionArg.toInt();
-  barrierServo1.write(positionInt);
+  barrierServo1.write(180 - positionInt);
   barrierServo2.write(positionInt);
   return OK;
 }
@@ -230,7 +230,7 @@ static float read_us() {
   // Read return pulse.
   float duration = (float) pulseIn(echoPin, HIGH, 10000);       // In microseconds.
   if (duration == 0) {
-    duration = 999
+    duration = 999;
   }
 
   return duration * ULTRASOUND_COEFFICIENT; // distance in millimetres
