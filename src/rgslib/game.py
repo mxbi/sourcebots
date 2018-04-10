@@ -18,6 +18,7 @@ class GameState:
 		self._init_wall_positions()
 		self.robot_pos = [None, None]
 		self.robot_rot = None
+		self.last_pos_update_time = 0
 
 		assert friendly_zone in [0, 1, 2, 3]
 		self.friendly_zone = friendly_zone
@@ -35,9 +36,16 @@ class GameState:
 			util.Rectangle(581, 619, 381, 419),
 		]
 
+		self.zone_dict = {
+			0: np.array([241, 559]),
+			1: np.array([559, 559]),
+			2: np.array([559, 241]),
+			3: np.array([241, 241]),
+		}
+
 		# Minimum distance to avoid the edges of pillars by, in cm
 		# Should be roughly equal to width of robot so if center avoids expanded zone, then the sides will avoid the pillars
-		min_edge_distance = 15
+		min_edge_distance = 5
 		self.zones_to_avoid = [pillar.expand(min_edge_distance) for pillar in self.pillars]
 
 		# Edges of zones we want to avoid
@@ -58,7 +66,9 @@ class GameState:
 		for marker, y in zip([21, 22, 23, 24, 25, 26, 27], [1, 2, 3, 4, 5, 6, 7]):
 			self.wall_positions[marker] = (0, y*100)
 
-		column_positions = [(400, 619), (419, 600), (400, 582), (382, 600), (600, 419), (619, 400), (600, 382), (582, 400), (400, 219), (419, 200), (400, 182), (382, 200), (200, 419), (219, 400), (200, 382), (182, 400)]
+		# TODO: Set the correct ones for the actual competition
+#		column_positions = [(400, 619), (419, 600), (400, 582), (382, 600), (600, 419), (619, 400), (600, 382), (582, 400), (400, 219), (419, 200), (400, 182), (382, 200), (200, 419), (219, 400), (200, 382), (182, 400)]
+		column_positions = [(400, 613), (413, 600), (400, 588), (388, 600), (609, 428), (619, 405), (609, 377), (600, 405), (400, 253), (410, 230), (400, 208), (391, 230), (227, 421), (248, 400), (227, 379), (206, 400)]
 
 		for marker, pos in zip(range(28, 44), column_positions):
 			self.wall_positions[marker] = pos
@@ -92,6 +102,7 @@ class GameState:
 		cosalpha = (r0 ** 2 + marker_distance ** 2 - r1 ** 2) / (2 * r0 * marker_distance)
 		if np.abs(cosalpha) > 1:
 			print('[GameState][WARN] cosalpha has invalid value {}', cosalpha)
+			return None, None
 			cosalpha = np.clip(cosalpha, -1, 1)
 		alpha = np.arccos(cosalpha) * phi_sign
 
@@ -122,13 +133,10 @@ class GameState:
 			return 'ENEMY'
 
 	def friendly_zone_middle(self):
-		zone_dict = {
-			0: np.array([241, 559]),
-			1: np.array([559, 559]),
-			2: np.array([559, 241]),
-			3: np.array([241, 241]),
-		}
-		return zone_dict[self.friendly_zone]
+		return self.zone_dict[self.friendly_zone]
+
+	def opposite_zone_middle(self):
+		return self.zone_dict[(self.friendly_zone + 2) % 4]
 
 	def robot_state_blocking(self):
 		initial_count = self.vision_updates
@@ -161,12 +169,16 @@ class GameState:
 			rotations = []
 			for stuff in combinations:
 				pos, rot = self._robot_position(*stuff)
-				positions.append(pos)
-				rotations.append(rot)
+				if pos is not None:
+					positions.append(pos)
+					rotations.append(rot)
+			if verbose:
+				print('Combinations:', len(positions))
 			pos = np.mean(positions, axis=0)
 			rot = np.mean(rotations, axis=0)
 			if verbose:
 				print('[GameState] Found {} markers, determined position {} rotation {}'.format(len(useful_markers), pos, rot))
+			self.last_pos_update_time = time.time()
 			self.robot_pos = pos
 			self.robot_rot = rot
 			return pos, rot

@@ -23,10 +23,10 @@ class Rectangle:
 		self.edges = [self.north_edge, self.east_edge, self.south_edge, self.west_edge]
 
 		self.corner_dict = {
-			self.a: ((self.west_edge, self.north_edge), np.array([-1, 1])),
-			self.b: ((self.north_edge, self.east_edge), np.array([1, 1])),
-			self.c: ((self.east_edge, self.south_edge), np.array([1, -1])),
-			self.d: ((self.south_edge, self.west_edge), np.array([-1, -1])),
+			str(self.a): (self.a, (self.west_edge, self.north_edge), np.array([-1, 1])),
+			str(self.b): (self.b, (self.north_edge, self.east_edge), np.array([1, 1])),
+			str(self.c): (self.c, (self.east_edge, self.south_edge), np.array([1, -1])),
+			str(self.d): (self.d, (self.south_edge, self.west_edge), np.array([-1, -1])),
 		}
 
 	# Expands the square in all directions by the given amount
@@ -58,7 +58,7 @@ class Rectangle:
 			print('[Rectangle][WARN] Only one edge crossed but alternative_route called')
 			return [line]
 
-		for corner, ((edge1, edge2), direction) in self.corner_dict:
+		for _, (corner, (edge1, edge2), direction) in self.corner_dict.items():
 			if edge1 in bad_edges and edge2 in bad_edges:
 				# Line goes through two adjacent edges, so if we stay clear of the corner we'll be fine
 				#
@@ -118,8 +118,8 @@ class Rectangle:
 				corner0 = self.b
 				corner1 = self.a
 
-		_, pad0 = self.corner_dict[corner0]
-		_, pad1 = self.corner_dict[corner1]
+		_, pad0 = self.corner_dict[str(corner0)]
+		_, pad1 = self.corner_dict[str(corner1)]
 
 		# Go via the corners
 

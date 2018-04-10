@@ -4,7 +4,7 @@ from robot import COAST
 from collections import defaultdict
 
 from . import trig
-from . import nostdout, wait_until
+from . import nostdout, wait_until, timeout
 from . import RE_LATENCY, FAST_MOVE_SPEED, RE_MOVE_OFFSET, RE_PER_CM, VELOCITY_UPDATE_ALPHA, ACTIVE_CORRECTION_ALPHA, \
 	RE_PREDICT_TIME, FAST_ROTATE_SPEED, RE_PER_DEGREE, ROTATION_K
 
@@ -16,7 +16,7 @@ class MotionController:
 
 		self._update_re()
 
-		self.barrier_raised = False
+		self.is_barrier_open = False
 
 		self.gamestate = gamestate
 		if gamestate is None:
@@ -28,10 +28,24 @@ class MotionController:
 
 	# Update the rotary encoder time
 	def update_re(self):
-		with nostdout():
-			self.left_re, self.right_re = [int(i) for i in self.arduino.direct_command('r')]
+		for i in range(5):
+			try:
+				with timeout(seconds=1):
+					self.left_re, self.right_re = [int(i) for i in self.arduino.direct_command('r')]
+			except Exception as e:
+				print('[MotionController][ERROR] Arduino failed to respond to rotary encoder request with "{}", retrying...'.format(e))
+			finally:
+				break
 		self.re = np.array([self.left_re, self.right_re])
 		self.re_time = time.time() - RE_LATENCY  # Estimate actual time measurement was taken
+
+	# Don't hurt me salv
+	def update_re_return_ultrasound(self):
+		with nostdout():
+			self.left_re, self.right_re, ultrasound_distance = [int(i) for i in self.arduino.direct_command('u')]
+		self.re = np.array([self.left_re, self.right_re])
+		self.re_time = time.time() - RE_LATENCY  # Estimate actual time measurement was taken
+		return ultrasound_distance / 10
 
 	# Backwards-compatibility
 	def _update_re(self):
@@ -61,26 +75,44 @@ class MotionController:
 	def speed(self, speed):
 		if hasattr(speed, '__len__') and speed != COAST:
 			if len(speed) == 2:  # Allow vectors
-				self.r.motor_board.m0, self.r.motor_board.m1 = speed
+				try:
+					self.r.motor_board.m0, self.r.motor_board.m1 = speed
+				except ValueError as e:
+					print('[MotionController][WTF] Motor board complained with {}, asking again nicely'.format(e))
+					time.sleep(0.05)
+					self.r.motor_board.m0, self.r.motor_board.m1 = speed
 			else:
 				raise ValueError("Tried setting speed with {} len {} ????".format(speed, len(speed)))
 		else:
-			print('Set speed to {}'.format(speed))
-			self.r.motor_board.m0, self.r.motor_board.m1 = speed, speed
+			#print('Set speed to {}'.format(speed))
+			try:
+				self.r.motor_board.m0, self.r.motor_board.m1 = speed, speed
+			except ValueError as e:
+				print('[MotionController][WTF] Motor board complained with {}, asking again nicely'.format(e))
+				time.sleep(0.05)
+				self.r.motor_board.m0, self.r.motor_board.m1 = speed, speed
 
 	def _aminusb(self, arr):
 		return arr[0] - arr[1]
 
-	def open_barrier(self):
-		self.arduino.direct_command('servo', 90, 0)
-		self.barrier_raised = True
+	def barrier_open(self):
+		self.arduino.direct_command('servo', 130, 0)
+		self.is_barrier_open = True
 
-	def close_barrier(self):
-		self.arduino.direct_command('servo', 0, 0)
-		self.barrier_raised = False
+	def barrier_close(self):
+		self.arduino.direct_command('servo', 56, 0)
+		self.is_barrier_open = False
+
+	def barrier_plough(self):
+		self.arduino.direct_command('servo', 75, 0)
+		self.is_barrier_open = False
+
+	def barrier_reverse_plough(self):
+		self.arduino.direct_command('servo', 17, 0)
+		self.is_barrier_open = False
 
 
-	def move(self, distance, speed=FAST_MOVE_SPEED, interrupts=[], verbose=1, coast=False):
+	def move(self, distance, speed=FAST_MOVE_SPEED, interrupts=[], verbose=1, coast=False, ultrasound_interrupt_distance=None):
 		"""Accurately move `distance` cm using rotary encoders. Can be negative
 
 		Parameters:
@@ -95,6 +127,7 @@ class MotionController:
 		"""
 
 		initial_pos = self.gamestate.robot_pos if self.gamestate is not None else None
+		initial_rot = self.gamestate.robot_rot if self.gamestate is not None else None
 
 		logs = defaultdict(list)
 		logs['start_time'] = time.time()
@@ -191,8 +224,8 @@ class MotionController:
 			print(message)
 
 		distance = np.mean(logs['distances'][-1])
-		if initial_pos is not None:
-			self.gamestate.robot_pos = initial_pos + trig.to_cartesian_degrees(self.gamestate.robot_rot, distance)
+		if initial_pos is not None and initial_rot is not None:
+			self.gamestate.robot_pos = initial_pos + trig.to_cartesian_degrees(initial_rot, distance)
 			self.gamestate.vision_waits = 1
 
 		return logs
@@ -302,75 +335,118 @@ class MotionController:
 
 		return angles
 
-
 	# Warning: does not handle pillars
-	def move_to(self, target_pos, rotate_speed=0.25, move_speed=FAST_MOVE_SPEED, coast=False, verbose=1):
-		"""Move to precise co-ordinates. Will dynamically avoid obstacles
-
-		Parameters:
-		target_pos: Co-ordinates to move to
-		rotate_speed (default: 0.25): Base motor power to use when rotating
-		move_speed (default: {FAST_MOVE_SPEED}): Base motor power to use when moving
-		coast (default: True): Whether to slowly stop at the end - note this leads to overshot distances but avoids sudden breaking. Passed through to move()
-		verbose (default: 1): Verbosity level. 0->No messages, 1->Info messages, 2->All debug messages
-
-		Returns:
-		dict: logs
-		"""
-		target_pos = np.array(target_pos)
-		epsilon_angle = 3 # TODO: Improve this angle, maybe using atan2 to figure out acceptable distance
-
-		message = "[MotionController.move_to] Going to {} with speeds {}/{}".format(target_pos)
-		if verbose:
-			print(message)
+	def move_to(self, target_pos, rotate_speed=0.25, move_speed=FAST_MOVE_SPEED, coast=False):
+		epsilon_angle = 3
 
 		# Where we currently are
 		current_pos, current_rot = self.gamestate.robot_state_blocking()
 
-		wall_eps = 25 # Prevent moving within 25cm of a wall using this method
-		bad_end = any(pillar.is_point_inside(target_pos) for pillar in self.gamestate.pillars) or any(c > (800 - wall_eps) or c < (wall_eps) for c in target_pos)
+		# How we need to move
+		motion = target_pos - current_pos
 
-		if bad_end:
-			print('[MotionController.move_to][ERROR] Illegal position {} requested in move_to(), ignoring.'.format(target_pos))
-			pass
+		# Which way we need to be facing
+		target_rot, distance = trig.to_polar_degrees(motion)
+
+		while True:
+			# How much we need to turn to face that direction
+			angle = trig.normalise_angle_degrees(target_rot - current_rot)
+
+			if np.abs(angle) < epsilon_angle:
+				break
+
+			print(target_rot, current_rot, target_rot - current_rot, angle)
+			self.rotate(-angle, speed=rotate_speed)
+			update_time = self.gamestate.last_pos_update_time
+			_, current_rot = self.gamestate.robot_state_blocking()
+			#if self.gamestate.last_pos_update_time == update_time:
+			#	print('[GameState.move_to] Could not see markers, moving 90 degrees and retrying')
+			#	# self.move(-10, speed=-0.1)
+			#	self.rotate(90, speed=rotate_speed)
+			#	_, current_rot = self.gamestate.robot_state_blocking()
+
+		# angle is anticlockwise, rotate accepts clockwise, so -
+		self.move(distance, speed=move_speed, coast=coast)
+
+	def check_destination(self, target_pos, rotate_speed=0.25, move_speed=FAST_MOVE_SPEED, coast=False, verbose=1):
+		target_pos = np.array(target_pos)
+
+		# Where we currently are
+		current_pos, current_rot = self.gamestate.robot_state_blocking()
 
 		movement_line = (current_pos, target_pos)
 		bad_zones = [zone for zone in self.gamestate.zones_to_avoid if zone.is_crossed_by(movement_line)]
 
-		# If we never hit any pillars
-		if not bad_zones:
-			# How we need to move
-			motion = target_pos - current_pos
+		return bool(bad_zones)
 
-			# Which way we need to be facing
-			target_rot, distance = trig.to_polar_degrees(motion)
-
-			while True:
-				# How much we need to turn to face that direction
-				angle = trig.normalise_angle_degrees(target_rot - current_rot)
-
-				# Keep turning until we are within a certain range of the target
-				if np.abs(angle) < epsilon_angle:
-					break
-
-				# angle is anticlockwise, rotate accepts clockwise, so -
-				self.rotate(-angle, speed=rotate_speed)
-
-				# Update our rotation if we see any more markers
-				_, current_rot = self.gamestate.robot_state_blocking()
-
-			self.move(distance, speed=move_speed)
-		else:
-			first_bad_zone = bad_zones[0]
-			alternative_route = first_bad_zone.alternative_route(movement_line)
-
-			if verbose:
-				print('[MotionController.move_to] No direct path in move_to(), taking detour:', alternative_route)
-			for start, end in alternative_route:
-				# These may still go through other pillars (though unlikely), but we've stopped it going through at least
-				# one pillar and we'll handle each of the other pillars recursively
-				self.move_to(end, rotate_speed, move_speed, coast=coast, verbose=verbose)
-
-		message = "[MotionController.move_to] Finished moving to {}, estimated position {}".format(target_pos, self.gamestate.robot_pos)
-		if verbose:
-			print(message)
+	# # Warning: does not handle pillars
+	# def move_to(self, target_pos, rotate_speed=0.25, move_speed=FAST_MOVE_SPEED, coast=False, verbose=1):
+	# 	"""Move to precise co-ordinates. Will dynamically avoid obstacles
+	#
+	# 	Parameters:
+	# 	target_pos: Co-ordinates to move to
+	# 	rotate_speed (default: 0.25): Base motor power to use when rotating
+	# 	move_speed (default: {FAST_MOVE_SPEED}): Base motor power to use when moving
+	# 	coast (default: True): Whether to slowly stop at the end - note this leads to overshot distances but avoids sudden breaking. Passed through to move()
+	# 	verbose (default: 1): Verbosity level. 0->No messages, 1->Info messages, 2->All debug messages
+	#
+	# 	Returns:
+	# 	dict: logs
+	# 	"""
+	# 	target_pos = np.array(target_pos)
+	# 	epsilon_angle = 3 # TODO: Improve this angle, maybe using atan2 to figure out acceptable distance
+	#
+	# 	message = "[MotionController.move_to] Going to {} with speeds {}/{}".format(target_pos, move_speed, rotate_speed)
+	# 	if verbose:
+	# 		print(message)
+	#
+	# 	# Where we currently are
+	# 	current_pos, current_rot = self.gamestate.robot_state_blocking()
+	#
+	# 	wall_eps = 25 # Prevent moving within 25cm of a wall using this method
+	# 	bad_end = any(pillar.is_point_inside(target_pos) for pillar in self.gamestate.pillars) or any(c > (800 - wall_eps) or c < (wall_eps) for c in target_pos)
+	#
+	# 	if bad_end:
+	# 		print('[MotionController.move_to][ERROR] Illegal position {} requested in move_to(), ignoring.'.format(target_pos))
+	# 		pass
+	#
+	# 	movement_line = (current_pos, target_pos)
+	# 	bad_zones = [zone for zone in self.gamestate.zones_to_avoid if zone.is_crossed_by(movement_line)]
+	#
+	# 	# If we never hit any pillars
+	# 	if not bad_zones:
+	# 		# How we need to move
+	# 		motion = target_pos - current_pos
+	#
+	# 		# Which way we need to be facing
+	# 		target_rot, distance = trig.to_polar_degrees(motion)
+	#
+	# 		while True:
+	# 			# How much we need to turn to face that direction
+	# 			angle = trig.normalise_angle_degrees(target_rot - current_rot)
+	#
+	# 			# Keep turning until we are within a certain range of the target
+	# 			if np.abs(angle) < epsilon_angle:
+	# 				break
+	#
+	# 			# angle is anticlockwise, rotate accepts clockwise, so -
+	# 			self.rotate(-angle, speed=rotate_speed)
+	#
+	# 			# Update our rotation if we see any more markers
+	# 			_, current_rot = self.gamestate.robot_state_blocking()
+	#
+	# 		self.move(distance, speed=move_speed)
+	# 	else:
+	# 		first_bad_zone = bad_zones[0]
+	# 		alternative_route = first_bad_zone.alternative_route(movement_line)
+	#
+	# 		if verbose:
+	# 			print('[MotionController.move_to] No direct path in move_to(), taking detour:', alternative_route)
+	# 		for start, end in alternative_route:
+	# 			# These may still go through other pillars (though unlikely), but we've stopped it going through at least
+	# 			# one pillar and we'll handle each of the other pillars recursively
+	# 			self.move_to(end, rotate_speed, move_speed, coast=coast, verbose=verbose)
+	#
+	# 	message = "[MotionController.move_to] Finished moving to {}, estimated position {}".format(target_pos, self.gamestate.robot_pos)
+	# 	if verbose:
+	# 		print(message)
