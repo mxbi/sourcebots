@@ -20,8 +20,9 @@ static void serialWrite(int commandId, char lineType, const String& str);
 Encoder encoderLeft(2, 4);
 Encoder encoderRight(3, 5);
 
-// Define servo
-Servo barrierServo;
+// Define servos
+Servo barrierServo1;
+Servo barrierServo2;
 
 // Switch var
 static bool switchPressed = false;
@@ -36,10 +37,14 @@ void setup() {
   Serial.begin(9600);
   Serial.setTimeout(5);
 
-  // barrier pin
+  // barrier setup
+  int initialPosition = 135
+  pinMode(8, OUTPUT);
   pinMode(9, OUTPUT);
-  barrierServo.attach(9);
-  barrierServo.write(97);
+  barrierServo1.attach(8);
+  barrierServo1.write(initialPosition);
+  barrierServo2.attach(9);
+  barrierServo2.write(initialPosition);
 
   // ultrasound pin
   pinMode(10, OUTPUT);
@@ -87,6 +92,8 @@ static CommandError led(int commandId, String argument) {
   return OK;
 }
 
+// Custom servo function
+
 static CommandError servo(int commandId, String argument) {
   String positionArg = pop_option(argument);
   String uselessArg = pop_option(argument);
@@ -96,7 +103,8 @@ static CommandError servo(int commandId, String argument) {
   }
 
   auto positionInt = positionArg.toInt();
-  barrierServo.write(positionInt);
+  barrierServo1.write(positionInt);
+  barrierServo2.write(positionInt);
   return OK;
 }
 
@@ -220,7 +228,10 @@ static float read_us() {
   digitalWrite(triggerPin, LOW);
 
   // Read return pulse.
-  float duration = (float) pulseIn(echoPin, HIGH);       // In microseconds.
+  float duration = (float) pulseIn(echoPin, HIGH, 10000);       // In microseconds.
+  if (duration == 0) {
+    duration = 999
+  }
 
   return duration * ULTRASOUND_COEFFICIENT; // distance in millimetres
 }
