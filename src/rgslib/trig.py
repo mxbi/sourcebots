@@ -80,7 +80,7 @@ def crosses(line0, line1):
 	a, b = line0
 	c, d = line1
 
-	ab_crosses_cd = np.sign(np.cross((a - c), (d - c))) != - np.sign(np.cross((b - c), (d - c)))
-	cd_crosses_ab = np.sign(np.cross((d - a), (b - a))) != - np.sign(np.cross((c - a), (b - a)))
+	ab_crosses_cd = np.sign(np.cross((a - c), (d - c))) != np.sign(np.cross((b - c), (d - c)))
+	cd_crosses_ab = np.sign(np.cross((d - a), (b - a))) != np.sign(np.cross((c - a), (b - a)))
 
 	return ab_crosses_cd and cd_crosses_ab
