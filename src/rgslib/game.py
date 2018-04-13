@@ -45,7 +45,7 @@ class GameState:
 
 		# Minimum distance to avoid the edges of pillars by, in cm
 		# Should be roughly equal to width of robot so if center avoids expanded zone, then the sides will avoid the pillars
-		min_edge_distance = 5
+		min_edge_distance = 40
 		self.zones_to_avoid = [pillar.expand(min_edge_distance) for pillar in self.pillars]
 
 		# Edges of zones we want to avoid
