@@ -109,31 +109,45 @@ class Rectangle:
 
 			if y1 > y0:
 				# We are going south to north
-				corner0 = self.c
-				corner1 = self.b
+				choices = [[self.c, self.b], [self.d, self.a]]
 			else:
 				# We are going north to south
-				corner0 = self.b
-				corner1 = self.c
-		else:   # Lines go through east and west edges
+				choices = [[self.b, self.c], [self.a, self.d]]
+		else:  # Lines go through east and west edges
 			x0, _ = start
 			x1, _ = end
 
 			if x1 > x0:
 				# We are going east to west
-				corner0 = self.a
-				corner1 = self.b
+				choices = [[self.a, self.b], [self.d, self.c]]
 			else:
 				# We are going west to east
-				corner0 = self.b
-				corner1 = self.a
+				choices = [[self.b, self.a], [self.c, self.d]]
 
-		_, _, pad0 = self.corner_dict[str(corner0)]
-		_, _, pad1 = self.corner_dict[str(corner1)]
+		min_distance = None
+		chosen_route = None
 
-		# Go via the corners
+		# There are multiple options: we can go to the left or to the right of the pillar, so choose the shortest route
+		for choice in choices:
+			corner0, corner1 = choice
+			_, _, pad0 = self.corner_dict[str(corner0)]
+			_, _, pad1 = self.corner_dict[str(corner1)]
 
-		middle0 = corner0 + pad0
-		middle1 = corner1 + pad1
+			# Go via the corners
+			middle0 = corner0 + pad0 * pad_distance
+			middle1 = corner1 + pad1 * pad_distance
+			potential_route = [(start, middle0), (middle0, middle1), (middle1, end)]
 
-		return [(start, middle0), (middle0, middle1), (middle1, end)]
+			distance = 0
+
+			for line in potential_route:
+				a, b = line
+				distance += trig.magnitude(b - a)
+
+			if min_distance is None or distance < min_distance:
+				min_distance = distance
+				chosen_route = potential_route
+
+		assert chosen_route is not None
+
+		return chosen_route
