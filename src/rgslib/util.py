@@ -2,6 +2,16 @@ import numpy as np
 from .import trig
 
 
+def contains_line(edges, edge):
+	for x in edges:
+		a, b = x
+		c, d = edge
+		if (a == c).all() and (b == d).all():
+			return True
+
+	return False
+
+
 class Rectangle:
 	# Represents a rectangular zone bounded in the y-axis by (south, north) and in the x-axis by (west, east)
 	def __init__(self, south, north, west, east):
@@ -59,7 +69,7 @@ class Rectangle:
 			return [line]
 
 		for _, (corner, (edge1, edge2), direction) in self.corner_dict.items():
-			if edge1 in bad_edges and edge2 in bad_edges:
+			if contains_line(bad_edges, edge1) and contains_line(bad_edges, edge2):
 				# Line goes through two adjacent edges, so if we stay clear of the corner we'll be fine
 				#
 				# Before:
@@ -93,7 +103,7 @@ class Rectangle:
 		# If we get here, that means the line goes through opposite edges
 
 		# If the line goes through south and north edges
-		if self.north_edge in bad_edges and self.south_edge in bad_edges:
+		if contains_line(bad_edges, self.north_edge) and contains_line(bad_edges, self.south_edge):
 			_, y0 = start
 			_, y1 = end
 

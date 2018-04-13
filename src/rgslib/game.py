@@ -103,7 +103,8 @@ class GameState:
 		if np.abs(cosalpha) > 1:
 			print('[GameState][WARN] cosalpha has invalid value {}', cosalpha)
 			return None, None
-			cosalpha = np.clip(cosalpha, -1, 1)
+			# cosalpha = np.clip(cosalpha, -1, 1)
+		
 		alpha = np.arccos(cosalpha) * phi_sign
 
 		# The position of the robot as a complex number
