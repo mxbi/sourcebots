@@ -24,10 +24,10 @@ ROTATION_K = 0.14
 FAST_MOVE_SPEED = 0.9
 FAST_ROTATE_SPEED = 0.45
 
-VELOCITY_UPDATE_ALPHA = 0.5 # Update rate for velocity (v1 = alpha * d(RE)/dt + (1 -alpha) * v0
-ACTIVE_CORRECTION_ALPHA = 0.05 # Intensity of active correction
+VELOCITY_UPDATE_ALPHA = 0.5  # Update rate for velocity (v1 = alpha * d(RE)/dt + (1 -alpha) * v0
+ACTIVE_CORRECTION_ALPHA = 0.05  # Intensity of active correction
 
-VISION_DISTANCE_FACTOR = 0.88 * 100 # Actual cms per sourcebots-metre
+VISION_DISTANCE_FACTOR = 0.88 * 100  # Actual cms per sourcebots-metre
 
 
 # Use 'with nostdout():' to silence output.
@@ -41,17 +41,22 @@ def nostdout():
 		finally:
 			sys.stdout = old_stdout
 
+
 class timeout:
-    def __init__(self, seconds=1, error_message='Timeout'):
-        self.seconds = seconds
-        self.error_message = error_message
-    def handle_timeout(self, signum, frame):
-        raise TimeoutError(self.error_message)
-    def __enter__(self):
-        signal.signal(signal.SIGALRM, self.handle_timeout)
-        signal.alarm(self.seconds)
-    def __exit__(self, type, value, traceback):
-        signal.alarm(0)
+	def __init__(self, seconds=1, error_message='Timeout'):
+		self.seconds = seconds
+		self.error_message = error_message
+
+	def handle_timeout(self, signum, frame):
+		raise TimeoutError(self.error_message)
+
+	def __enter__(self):
+		signal.signal(signal.SIGALRM, self.handle_timeout)
+		signal.alarm(self.seconds)
+
+	def __exit__(self, type, value, traceback):
+		signal.alarm(0)
+
 
 def handle_arduino_bullshit():
 	raise NotImplementedError
