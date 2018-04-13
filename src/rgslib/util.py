@@ -118,8 +118,8 @@ class Rectangle:
 				corner0 = self.b
 				corner1 = self.a
 
-		_, pad0 = self.corner_dict[str(corner0)]
-		_, pad1 = self.corner_dict[str(corner1)]
+		_, _, pad0 = self.corner_dict[str(corner0)]
+		_, _, pad1 = self.corner_dict[str(corner1)]
 
 		# Go via the corners
 
