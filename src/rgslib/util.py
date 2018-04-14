@@ -2,6 +2,9 @@ import numpy as np
 from .import trig
 
 
+# Because numpy is a special spud, equality of np arrays returns an array rather than a fucking boolean like any sane
+# definition would
+# This detects if the pair 'edge' is in the list of pairs 'edges'
 def contains_line(edges, edge):
 	for x in edges:
 		a, b = x
@@ -43,9 +46,19 @@ class Rectangle:
 	def expand(self, distance):
 		return Rectangle(self.south - distance, self.north + distance, self.west - distance, self.east + distance)
 
+	# Makes the square smaller in every direction by the given amount
+	def shrink(self, distance):
+		return self.expand(-distance)
+
+	# The position of the centre of the rectangle as a 2d np array
+	def centre(self):
+		return np.array([(self.west + self.east) / 2, (self.south + self.north) / 2])
+
+	# Whether the given line (from, to) crosses any of the edges of the rectangle, and therefore the rectangle itself
 	def is_crossed_by(self, line):
 		return any(trig.crosses(line, edge) for edge in self.edges)
 
+	# Whether the given point lies inside the rectangle
 	def is_point_inside(self, point):
 		x, y = point
 		return self.west < x < self.east and self.south < y < self.north

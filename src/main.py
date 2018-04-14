@@ -103,57 +103,16 @@ print(s.robot_pos, s.robot_rot)
 c.move_to(s.friendly_zone_middle())
 print(s.robot_pos, s.robot_rot)
 
+# Make sure we are most definitely 100% where we need to be, for real this time
+pos, _ = s.robot_state_blocking()
 
-# c.barrier_reverse_plough()
-#
-# while True:
-# 	if (time.time() - start_time) > 200:
-# 		print('Exiting at 2 mins')
-# 		break
-# 	t0 = time.time()
-# 	m = [m for m in v.markers_blocking() if s.get_marker_type(m) == 'ENEMY']
-# 	print(time.time() - t0)
-# 	if m:
-# 		turns_since_box = 0
-# 		m = [m for m in v.markers_semiblocking() if s.get_marker_type(m) == 'ENEMY']
-# 		if len(m) > 0:
-# 			m0 = sorted(m, key=lambda x: x.spherical.distance_metres)[0]
-# 			id = m0.id
-# 			s.box_id = id
-#
-# 			t0 = v.last_marker_time
-#
-# 			def bad_angle_interrupt():
-# 				markers = v.markers
-# 				id_markers = [m for m in markers if m.id == id]
-# 				if len(id_markers) == 0:
-# 					return 0
-# 				else:
-# 					m0 = id_markers[0]
-# 					angle = m0.spherical.rot_y_degrees
-# 					distance = m0.spherical.distance_metres * lib.VISION_DISTANCE_FACTOR
-# 					if np.abs(angle) > np.abs(np.arctan2(20, distance))*(180 / np.pi) + 1 and np.abs(angle) > 5 and v.last_marker_time > t0:
-# 						return 'ANGLE TOO WIDE {}'.format(angle)
-# 					else:
-# 						return 0
-#
-# 			angle = m0.spherical.rot_y_degrees
-# 			distance = m0.spherical.distance_metres * lib.VISION_DISTANCE_FACTOR
-# 			print('Found box, angle/distance:', angle, distance)
-# 			if np.abs(angle) > 5:
-# 				c.rotate(angle, speed=0.25)
-# 			else:
-# 				c.rotate(angle, speed=0.15)
-# 			if not bad_angle_interrupt():
-# 				c.move(120, speed=0.6, interrupts=[bad_angle_interrupt])
-# 				c.barrier_plough()
-# 				time.sleep(1)
-# 				c.barrier_reverse_plough()
-# 				time.sleep(1)
-# 				c.move_to(s.friendly_zone_middle(), move_speed=0.6)
-# 			s.box_id = None
-# 	else:
-# 		c.rotate(30)
+# Where we should currently be
+home_zone_rectangle = s.home_zone_rectangle.shrink(40)
+
+# Oh, no! We're not where we're supposed to be!
+while not home_zone_rectangle.is_point_inside(pos):
+	c.move_to(s.friendly_zone_middle())
+	pos, _ = s.robot_state_blocking()
 
 print("wedidit.jpg")
 del v
