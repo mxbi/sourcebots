@@ -160,10 +160,22 @@ class MotionController:
 				old_re = self.re.copy()
 				old_re_time = self.re_time
 
+				# Ultrasound interrupts
+				broke_ultrasound = 0
 				if ultrasound_interrupt_distance:
-					us = self.update_re_return_ultrasound()
-					if us < ultrasound_interrupt_distance
-						raise
+					while True:
+						us = self.update_re_return_ultrasound()
+						if broke_ultrasound > 20:
+							print('[MotionController.move][WARN] Ultrasound blocking 20 times, exiting early!!'.format(us))
+							return
+						elif us < ultrasound_interrupt_distance:
+							self.speed = 0
+							broke_ultrasound += 1
+							print('[MotionController.move] Ultrasound detected something with distance {}, pausing'.format(us))
+						else:
+							if broke_ultrasound:
+								self.speed = speed
+							break
 				else:
 					self.update_re()
 
