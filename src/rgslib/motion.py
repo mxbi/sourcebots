@@ -41,8 +41,14 @@ class MotionController:
 
 	# Don't hurt me salv
 	def update_re_return_ultrasound(self):
-		with nostdout():
-			self.left_re, self.right_re, ultrasound_distance = [int(i) for i in self.arduino.direct_command('u')]
+		for i in range(5):
+			try:
+				with timeout(seconds=1):
+					self.left_re, self.right_re, ultrasound_distance = [int(i) for i in self.arduino.direct_command('u')]
+			except Exception as e:
+				print('[MotionController][ERROR] Arduino failed to respond to rotary encoder+ultrasound request with "{}", retrying...'.format(e))
+			finally:
+				break
 		self.re = np.array([self.left_re, self.right_re])
 		self.re_time = time.time() - RE_LATENCY  # Estimate actual time measurement was taken
 		return ultrasound_distance / 10
@@ -111,7 +117,6 @@ class MotionController:
 		self.arduino.direct_command('servo', 17, 0)
 		self.is_barrier_open = False
 
-
 	def move(self, distance, speed=FAST_MOVE_SPEED, interrupts=[], verbose=1, coast=False, ultrasound_interrupt_distance=None):
 		"""Accurately move `distance` cm using rotary encoders. Can be negative
 
@@ -155,7 +160,12 @@ class MotionController:
 				old_re = self.re.copy()
 				old_re_time = self.re_time
 
-				self._update_re()
+				if ultrasound_interrupt_distance:
+					us = self.update_re_return_ultrasound()
+					if us < ultrasound_interrupt_distance
+						raise
+				else:
+					self.update_re()
 
 				# Note this is a vector because re/old_re is a vector
 				total_distance = (self.re - initial_re) / RE_PER_CM

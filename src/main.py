@@ -95,13 +95,14 @@ c.barrier_close()
 # Make sure the gamestate position is updated before moving
 v.markers_blocking()
 print(s.robot_pos, s.robot_rot)
-intersecting = c.check_destination(s.friendly_zone_middle())
-if intersecting:
-	print("[Salv] Motion intersecting pillar")
-	# c.move_to(s.opposite_zone_middle())
-	# print(s.robot_pos, s.robot_rot)
+# intersecting = c.check_destination(s.friendly_zone_middle())
+# if intersecting:
+# 	print("[Salv] Motion intersecting pillar")
+# 	# c.move_to(s.opposite_zone_middle())
+# 	# print(s.robot_pos, s.robot_rot)
 c.move_to(s.friendly_zone_middle())
 print(s.robot_pos, s.robot_rot)
+
 
 # c.barrier_reverse_plough()
 #
