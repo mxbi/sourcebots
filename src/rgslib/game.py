@@ -176,7 +176,7 @@ class GameState:
 			if verbose:
 				print('Combinations:', len(positions))
 			pos = np.mean(positions, axis=0)
-			rot = np.mean(rotations, axis=0)
+			rot = trig.angle_degrees(sum(trig.to_cartesian_degrees(angle, 1) for angle in rotations))
 			if verbose:
 				print('[GameState] Found {} markers, determined position {} rotation {}'.format(len(useful_markers), pos, rot))
 			self.last_pos_update_time = time.time()
