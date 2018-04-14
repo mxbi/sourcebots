@@ -36,12 +36,22 @@ class GameState:
 			util.Rectangle(581, 619, 381, 419),
 		]
 
+		# friendly_zone id vs centre of zone
 		self.zone_dict = {
 			0: np.array([241, 559]),
 			1: np.array([559, 559]),
 			2: np.array([559, 241]),
 			3: np.array([241, 241]),
 		}
+
+		self.home_zone_rectangle_dict = {
+			0: util.Rectangle(418.5, 700, 100, 381.5),
+			1: util.Rectangle(418.5, 700, 418.5, 700),
+			2: util.Rectangle(100, 381.5, 418.5, 700),
+			3: util.Rectangle(100, 381.5, 100, 381.5),
+		}
+
+		self.home_zone_rectangle = self.home_zone_rectangle_dict[friendly_zone]
 
 		# Minimum distance to avoid the edges of pillars by, in cm
 		# Should be roughly equal to width of robot so if center avoids expanded zone, then the sides will avoid the pillars
@@ -67,8 +77,8 @@ class GameState:
 			self.wall_positions[marker] = (0, y*100)
 
 		# TODO: Set the correct ones for the actual competition
-#		column_positions = [(400, 619), (419, 600), (400, 582), (382, 600), (600, 419), (619, 400), (600, 382), (582, 400), (400, 219), (419, 200), (400, 182), (382, 200), (200, 419), (219, 400), (200, 382), (182, 400)]
-		column_positions = [(400, 613), (413, 600), (400, 588), (388, 600), (609, 428), (619, 405), (609, 377), (600, 405), (400, 253), (410, 230), (400, 208), (391, 230), (227, 421), (248, 400), (227, 379), (206, 400)]
+		column_positions = [(400, 619), (419, 600), (400, 582), (382, 600), (600, 419), (619, 400), (600, 382), (582, 400), (400, 219), (419, 200), (400, 182), (382, 200), (200, 419), (219, 400), (200, 382), (182, 400)]
+#		column_positions = [(400, 613), (413, 600), (400, 588), (388, 600), (609, 428), (619, 405), (609, 377), (600, 405), (400, 253), (410, 230), (400, 208), (391, 230), (227, 421), (248, 400), (227, 379), (206, 400)]
 
 		for marker, pos in zip(range(28, 44), column_positions):
 			self.wall_positions[marker] = pos
@@ -176,7 +186,7 @@ class GameState:
 			if verbose:
 				print('Combinations:', len(positions))
 			pos = np.mean(positions, axis=0)
-			rot = np.mean(rotations, axis=0)
+			rot = trig.angle_degrees(sum(trig.to_cartesian_degrees(angle, 1) for angle in rotations))
 			if verbose:
 				print('[GameState] Found {} markers, determined position {} rotation {}'.format(len(useful_markers), pos, rot))
 			self.last_pos_update_time = time.time()
