@@ -36,14 +36,6 @@ class GameState:
 			util.Rectangle(581, 619, 381, 419),
 		]
 
-		# friendly_zone id vs centre of zone
-		self.zone_dict = {
-			0: np.array([241, 559]),
-			1: np.array([559, 559]),
-			2: np.array([559, 241]),
-			3: np.array([241, 241]),
-		}
-
 		self.home_zone_rectangle_dict = {
 			0: util.Rectangle(418.5, 700, 100, 381.5),
 			1: util.Rectangle(418.5, 700, 418.5, 700),
@@ -51,11 +43,16 @@ class GameState:
 			3: util.Rectangle(100, 381.5, 100, 381.5),
 		}
 
+		# friendly_zone id vs centre of zone
+		self.zone_dict = [
+			zone.centre() for _, zone in self.home_zone_rectangle_dict
+		]
+
 		self.home_zone_rectangle = self.home_zone_rectangle_dict[friendly_zone]
 
 		# Minimum distance to avoid the edges of pillars by, in cm
 		# Should be roughly equal to width of robot so if center avoids expanded zone, then the sides will avoid the pillars
-		min_edge_distance = 40
+		min_edge_distance = 20
 		self.zones_to_avoid = [pillar.expand(min_edge_distance) for pillar in self.pillars]
 
 		# Edges of zones we want to avoid
