@@ -30,12 +30,13 @@ class MotionController:
 	def update_re(self):
 		for i in range(5):
 			try:
-				with timeout(seconds=1):
+				with timeout(1):
 					self.left_re, self.right_re = [int(i) for i in self.arduino.direct_command('r')]
+				break
+			except KeyboardInterrupt:
+				raise
 			except Exception as e:
 				print('[MotionController][ERROR] Arduino failed to respond to rotary encoder request with "{}", retrying...'.format(e))
-			finally:
-				break
 		self.re = np.array([self.left_re, self.right_re])
 		self.re_time = time.time() - RE_LATENCY  # Estimate actual time measurement was taken
 
@@ -43,15 +44,14 @@ class MotionController:
 	def update_re_return_ultrasound(self):
 		for i in range(5):
 			try:
-				with timeout(seconds=1):
+				with timeout(1):
 					self.left_re, self.right_re, ultrasound_distance = [int(float(i)) for i in self.arduino.direct_command('u')]
+				break
 			except KeyboardInterrupt:
 				raise
 			except Exception as e:
 				print('[MotionController][ERROR] Arduino failed to respond to rotary encoder+ultrasound request with "{}", retrying...'.format(e))
-			finally:
-				break
-		print(ultrasound_distance)
+#		print(ultrasound_distance)
 		self.re = np.array([self.left_re, self.right_re])
 		self.re_time = time.time() - RE_LATENCY  # Estimate actual time measurement was taken
 		return ultrasound_distance / 10
@@ -434,12 +434,18 @@ class MotionController:
 		if bad_end:
 			print('[MotionController.move_to][ERROR] Illegal position {} requested in move_to(), ignoring.'.format(target_pos))
 			pass
-
+		
+		# Whether we start inside a pillar
+		bad_start = any(pillar.is_point_inside(current_pos) for pillar in self.gamestate.pillars)
+		
 		movement_line = (current_pos, target_pos)
 		bad_zones = [zone for zone in self.gamestate.zones_to_avoid if zone.is_crossed_by(movement_line)]
 
 		# If we never hit any pillars
-		if not bad_zones:
+		if not bad_zones or bad_start:
+			if bad_start:
+				print('[MotionController.move_to][WARN] Starting inside a pillar, continuing as normal.')
+			
 			# How we need to move
 			motion = target_pos - current_pos
 

@@ -4,7 +4,10 @@ import pygame
 import time
 import numpy as np
 import threading
+import sys
 import traceback
+import os
+import pickle
 
 WHITE = np.array((255, 255, 255))
 BLACK = np.array((0, 0, 0))
@@ -65,6 +68,8 @@ def draw_arena(screen, s, vision):
 
 def draw_robot(screen, s, vision):
 	rot = s.robot_rot
+	if rot is None:
+		print('[Eagle] Robot position unknown, cannot draw')
 	rot /= (180 / np.pi)  # Transform to radians
 	rot = (np.pi/2) - rot  # Transform to clockwise from y direction
 	pos = transform(s.robot_pos)  # Transform co-ordinates to pixel values
@@ -87,7 +92,7 @@ def draw_robot(screen, s, vision):
 	# Draw line pointing ahead
 	vertices = np.array([[0, -35], [0, -300]])
 	vertices = pos + np.dot(rot_matrix, vertices.T).T
-	pygame.draw.aaline(screen, (200, 200, 255), *vertices, 1)
+	pygame.draw.aaline(screen, (200, 200, 255), vertices[0], vertices[1], 1)
 
 	# Draw a triangle and apply the rotation matrix again
 	vertices = np.array([[-10, -25], [0, -35], [10, -25]])
@@ -145,6 +150,112 @@ class EagleThread(threading.Thread):
 				except Exception as e:
 					print(traceback.format_exc())
 					print('Failed to render frame', e)
+
+
+# Thread which continuously updates the vision controller's 'markers' field with the latest reading of markers
+class EagleThread(threading.Thread):
+	def __init__(self, gamestate, vision, framerate=1):
+		self.gamestate = gamestate
+		self.vision = vision
+		self.framerate = framerate
+
+		threading.Thread.__init__(self)
+		pygame.init()
+		self.screen = pygame.display.set_mode(DISPLAY_SIZE)
+		done = False
+
+	def run(self):
+			c = WHITE
+			while True:
+				t0 = time.time()
+				for event in pygame.event.get():
+					if event.type == pygame.QUIT:
+						break
+				try:
+					draw_arena(self.screen, self.gamestate, self.vision)
+					draw_robot(self.screen, self.gamestate, self.vision)
+					pygame.draw.polygon(self.screen, c, box((0, 0), 20))
+
+					# Print elapsed time
+					msg_font = pygame.font.SysFont("roboto", 36)
+					text = msg_font.render("{:.2f}s".format(self.gamestate.elapsed_time()), True, BLACK)
+					self.screen.blit(text, (25, 25))
+
+					pygame.display.flip()  # Swap frame buffers, print current buffer to display
+					c = BLACK if (c == WHITE).all() else WHITE
+					time.sleep(max(0, 1 / self.framerate - (time.time() - t0)))  # Wait remaining frametime
+				except Exception as e:
+					print(traceback.format_exc())
+					print('Failed to render frame', e)
+
+def offline_playback(f, framerate=5):
+	class FakeVision():
+		def __init__(self, markers):
+			self.markers = markers
+			self.fake = 'yeah not gonna lie'
+
+	fp = open(f, 'rb')
+	pygame.init()
+	screen = pygame.display.set_mode(DISPLAY_SIZE)
+	c = WHITE
+
+	while True:
+		try:
+			t0 = time.time()
+			timestamp, gamestate, markers = pickle.load(fp)
+			vision = FakeVision(markers)
+
+			draw_arena(screen, gamestate, vision)
+			draw_robot(screen, gamestate, vision)
+			pygame.draw.polygon(screen, c, box((0, 0), 20))
+
+			# Print elapsed time
+			msg_font = pygame.font.SysFont("roboto", 36)
+			text = msg_font.render("{:.2f}s".format(gamestate.elapsed_time()), True, BLACK)
+			screen.blit(text, (25, 25))
+
+			pygame.display.flip()  # Swap frame buffers, print current buffer to display
+			c = BLACK if (c == WHITE).all() else WHITE
+			time.sleep(max(0, 1 / framerate - (time.time() - t0)))  # Wait remaining frametime
+		except Exception as e:
+			print('Failed to render {} {}'.format(timestamp, e))
+
+
+# Thread which continuously updates the vision controller's 'markers' field with the latest reading of markers
+class OfflineEagleThread(threading.Thread):
+	def __init__(self, gamestate, vision, framerate=5):
+		self.gamestate = gamestate
+		self.vision = vision
+		self.framerate = framerate
+		self.start_time = time.time()
+
+		threading.Thread.__init__(self)
+		self.pickle_list = []
+
+		self.runfile = 'runs/run_{}.eagle'.format(int(self.start_time))
+		try:
+			os.mkdir('runs')
+		except:
+			pass
+
+	def run(self):
+			while True:
+				t0 = time.time()
+				# gamestate_dump = self.gamestate
+				# vision_dump = self.vision.markers
+				# pickle_data = (t0, gamestate_dump, vision_dump)
+				pickle_data = pickle.dump((t0, self.gamestate, self.vision.markers), open(self.runfile, 'ab'))
+				# with open(self.runfile, 'ab') as fp:
+				# 	fp.write(pickle_data)
+				# 	fp.write(b'$$$$$')
+
+				# try:
+				# 	os.mkdir('dumps')
+				# except:
+				# 	pass
+				# pickle.dump(self.pickle_list, open('dumps/run_{}.eagle'.format(int(self.start_time)), 'wb'), protocol=4)
+				# print(time.time() - t0)
+				time.sleep(max(0, 1 / self.framerate - (time.time() - t0)))  # Wait remaining frametime
 
 # Run swanky demo when script is run on its own
 def demo():
@@ -216,3 +327,7 @@ def demo():
 		full_update()
 
 	time.sleep(5)
+
+if __name__ == '__main__':
+	if len(sys.argv) > 1:
+		offline_playback(sys.argv[1])

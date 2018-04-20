@@ -9,7 +9,7 @@ from . import VISION_DISTANCE_FACTOR
 
 class GameState:
 	"""GameState calculates and stores estimates locations of all objects of interest in the game as well as localising the robot itself."""
-	def __init__(self, friendly_zone):
+	def __init__(self, friendly_zone, trig_markers=['COLUMN', 'WALL']):
 		try:
 			from robot import WALL, COLUMN, TOKEN_ZONE_0, TOKEN_ZONE_1, TOKEN_ZONE_2, TOKEN_ZONE_3
 		except ImportError:
@@ -28,6 +28,8 @@ class GameState:
 
 		self.init_time = time.time()
 		self.vision_waits = 0
+
+		self.useful_marker_list = trig_markers
 
 		self.pillars = [
 			util.Rectangle(381, 419, 181, 219),
@@ -57,6 +59,9 @@ class GameState:
 
 		# Edges of zones we want to avoid
 		self.edges_to_avoid = [edge for pillar in self.pillars for edge in pillar.edges]
+
+	def start(self):
+		self.init_time = time.time()
 
 	def _init_wall_positions(self):
 		# (x, y) of all the wall markers - see https://docs.sourcebots.co.uk/rules.pdf
@@ -172,7 +177,7 @@ class GameState:
 			return
 
 		self.vision_updates += 1
-		useful_markers = [m for m in markers if self.get_marker_type(m) in ['WALL', 'COLUMN']]
+		useful_markers = [m for m in markers if self.get_marker_type(m) in self.useful_marker_list]
 		if len(useful_markers) == 0:
 			if verbose:
 				print('[GameState] No anchored markers')
