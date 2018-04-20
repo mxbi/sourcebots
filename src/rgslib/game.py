@@ -47,7 +47,7 @@ class GameState:
 
 		# friendly_zone id vs centre of zone
 		self.zone_dict = [
-			zone.centre() for _, zone in self.home_zone_rectangle_dict
+			zone.centre() for _, zone in self.home_zone_rectangle_dict.items()
 		]
 
 		self.home_zone_rectangle = self.home_zone_rectangle_dict[friendly_zone]
