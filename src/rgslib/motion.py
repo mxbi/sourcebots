@@ -1,6 +1,6 @@
 import numpy as np
 import time
-from robot import COAST
+# from robot import COAST  # PLEASE STAY COMMENTED THIS TIME
 from collections import defaultdict
 
 from . import trig
@@ -8,6 +8,7 @@ from . import nostdout, wait_until, timeout
 from . import RE_LATENCY, FAST_MOVE_SPEED, RE_MOVE_OFFSET, RE_PER_CM, VELOCITY_UPDATE_ALPHA, ACTIVE_CORRECTION_ALPHA, \
 	RE_PREDICT_TIME, FAST_ROTATE_SPEED, RE_PER_DEGREE, ROTATION_K
 
+COAST = 'coast'
 
 class MotionController:
 	def __init__(self, robot, gamestate=None):
