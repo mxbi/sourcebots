@@ -38,7 +38,7 @@ void setup() {
   Serial.setTimeout(5);
 
   // barrier setup
-  int initialPosition = 135;
+  int initialPosition = 50;
   pinMode(8, OUTPUT);
   pinMode(9, OUTPUT);
   barrierServo1.attach(8);
@@ -230,7 +230,7 @@ static float read_us() {
   // Read return pulse.
   float duration = (float) pulseIn(echoPin, HIGH, 10000);       // In microseconds.
   if (duration == 0) {
-    duration = 999;
+    duration = 99999;
   }
 
   return duration * ULTRASOUND_COEFFICIENT; // distance in millimetres
