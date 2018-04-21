@@ -1,6 +1,5 @@
 from robot import Robot
 import rgslib as lib
-from rgslib import eagle
 import numpy as np
 import time
 import atexit
@@ -15,7 +14,7 @@ s = lib.GameState(0, trig_markers=['WALL', 'COLUMN']) # r.zone
 c = lib.MotionController(r, s)
 v = lib.VisionController(r, s)
 
-eagle.OfflineEagleThread(s, v).start()
+lib.OfflineEagleThread(s, v).start()
 #eagle.EagleThread(s, v).start()
 
 def exit():

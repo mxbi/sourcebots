@@ -48,7 +48,7 @@ class timeout:
 		self.error_message = error_message
 
 	def handle_timeout(self, signum, frame):
-		raise TimeoutError(self.error_message)
+		raise Exception(self.error_message)
 
 	def __enter__(self):
 		signal.signal(signal.SIGALRM, self.handle_timeout)
@@ -66,7 +66,7 @@ def wait_until(t):
 	"Wait until `t` in unix epoch time"
 	time.sleep(max(0, t - time.time()))
 
-
+from .minieagle import OfflineEagleThread
 from .motion import MotionController
 from .vision import VisionController
 from .game import GameState
