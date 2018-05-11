@@ -17,10 +17,6 @@ DISPLAY_SIZE = (1000, 1000)
 def transform(c):
 	return (c[0] + 100, 900 - c[1])
 
-def now():
-    """Returns the current time as a string in the format 'YYYY_MM_DD_HH_MM_SS'. Useful for timestamping filenames etc."""
-    return time.strftime("%Y_%m_%d__%H_%M_%S")
-
 # Create co-ordinates of a square with top-left corner position and size
 def box(c, size):
 	return [c, (c[0] + size, c[1]), (c[0] + size, c[1] + size), (c[0], c[1] + size)]
@@ -192,7 +188,7 @@ class EagleThread(threading.Thread):
 					print(traceback.format_exc())
 					print('Failed to render frame', e)
 
-def offline_playback(f, framerate=10):
+def offline_playback(f, framerate=5):
 	class FakeVision():
 		def __init__(self, markers):
 			self.markers = markers
@@ -203,14 +199,10 @@ def offline_playback(f, framerate=10):
 	screen = pygame.display.set_mode(DISPLAY_SIZE)
 	c = WHITE
 
-	first_timestamp = None
 	while True:
 		try:
 			t0 = time.time()
 			timestamp, gamestate, markers = pickle.load(fp)
-			if first_timestamp is None:
-				first_timestamp = gamestate.init_time
-				print(timestamp, gamestate.init_time)
 			vision = FakeVision(markers)
 
 			draw_arena(screen, gamestate, vision)
@@ -219,7 +211,7 @@ def offline_playback(f, framerate=10):
 
 			# Print elapsed time
 			msg_font = pygame.font.SysFont("roboto", 36)
-			text = msg_font.render("{:.2f}s".format(timestamp - first_timestamp), True, BLACK)
+			text = msg_font.render("{:.2f}s".format(gamestate.elapsed_time()), True, BLACK)
 			screen.blit(text, (25, 25))
 
 			pygame.display.flip()  # Swap frame buffers, print current buffer to display
@@ -240,7 +232,7 @@ class OfflineEagleThread(threading.Thread):
 		threading.Thread.__init__(self)
 		self.pickle_list = []
 
-		self.runfile = 'runs/run_{}-{}.eagle'.format(now(), framerate)
+		self.runfile = 'runs/run_{}.eagle'.format(int(self.start_time))
 		try:
 			os.mkdir('runs')
 		except:

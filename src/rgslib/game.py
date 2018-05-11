@@ -38,17 +38,20 @@ class GameState:
 			util.Rectangle(581, 619, 381, 419),
 		]
 
+		# friendly_zone id vs centre of zone
+		self.zone_dict = {
+			0: np.array([241, 559]),
+			1: np.array([559, 559]),
+			2: np.array([559, 241]),
+			3: np.array([241, 241]),
+		}
+
 		self.home_zone_rectangle_dict = {
 			0: util.Rectangle(418.5, 700, 100, 381.5),
 			1: util.Rectangle(418.5, 700, 418.5, 700),
 			2: util.Rectangle(100, 381.5, 418.5, 700),
 			3: util.Rectangle(100, 381.5, 100, 381.5),
 		}
-
-		# friendly_zone id vs centre of zone
-		self.zone_dict = [
-			zone.centre() for _, zone in self.home_zone_rectangle_dict.items()
-		]
 
 		self.home_zone_rectangle = self.home_zone_rectangle_dict[friendly_zone]
 
@@ -125,23 +128,11 @@ class GameState:
 		# The position of the robot as a numpy array
 		pos = np.array([z.real, z.imag])
 
-		return pos
+		# The angle the robot is facing measured anticlockwise from the horizontal
+		theta = np.angle(z0 - z) - theta0
+		theta_degrees = trig.normalise_angle_degrees(theta * (180/np.pi))
 
-	# Given the robot's position and the markers it can see, calculates the robot's rotation
-	def _robot_rotation(self, pos, markers):
-		# In order to take the mean of a bunch of angles, for each angle we take a step in that direction,
-		# And then we return the angle we end up at
-		# This prevents situations where the mean of -179 and 179 is 0 rather than 180
-		rotation_vector = np.zeros(2)
-
-		for marker in markers:
-			marker_pos = self.wall_positions[marker.id]
-			marker_rot = -marker.spherical.rot_y_degrees
-
-			robot_rot = trig.angle_degrees(marker_pos - pos) - marker_rot
-			rotation_vector += trig.to_cartesian_degrees(robot_rot, 1)
-
-		return trig.angle_degrees(rotation_vector)
+		return pos, theta_degrees
 
 	def elapsed_time(self):
 		return time.time() - self.init_time
@@ -191,14 +182,16 @@ class GameState:
 		else:
 			combinations = itertools.combinations(useful_markers, 2)
 			positions = []
+			rotations = []
 			for stuff in combinations:
-				pos = self._robot_position(*stuff)
+				pos, rot = self._robot_position(*stuff)
 				if pos is not None:
 					positions.append(pos)
+					rotations.append(rot)
 			if verbose:
 				print('Combinations:', len(positions))
 			pos = np.mean(positions, axis=0)
-			rot = self._robot_rotation(pos, markers)
+			rot = trig.angle_degrees(sum(trig.to_cartesian_degrees(angle, 1) for angle in rotations))
 			if verbose:
 				print('[GameState] Found {} markers, determined position {} rotation {}'.format(len(useful_markers), pos, rot))
 			self.last_pos_update_time = time.time()

@@ -1,5 +1,6 @@
 from robot import Robot
 import rgslib as lib
+from rgslib import eagle
 import numpy as np
 import time
 import atexit
@@ -14,8 +15,8 @@ s = lib.GameState(0, trig_markers=['WALL', 'COLUMN']) # r.zone
 c = lib.MotionController(r, s)
 v = lib.VisionController(r, s)
 
-lib.OfflineEagleThread(s, v).start()
-#eagle.EagleThread(s, v).start()
+#eagle.OfflineEagleThread(s, v).start()
+eagle.EagleThread(s, v).start()
 
 def exit():
 	c.speed = 0
@@ -29,7 +30,7 @@ start_time = time.time()
 s.start()
 
 # 730 = Distance from centre of starting zone to centre of opposite zone
-c.move(600, speed=0.99, coast=True, ultrasound_interrupt_distance=50)
+c.move(500, speed=0.99, coast=True, ultrasound_interrupt_distance=50)
 # c.move_to((80, 300), coast=True)
 # # c.move_to((350, 300), coast=True)
 # c.rotate(-90)

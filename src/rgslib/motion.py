@@ -1,6 +1,6 @@
 import numpy as np
 import time
-# from robot import COAST  # PLEASE STAY COMMENTED THIS TIME
+from robot import COAST
 from collections import defaultdict
 
 from . import trig
@@ -8,7 +8,6 @@ from . import nostdout, wait_until, timeout
 from . import RE_LATENCY, FAST_MOVE_SPEED, RE_MOVE_OFFSET, RE_PER_CM, VELOCITY_UPDATE_ALPHA, ACTIVE_CORRECTION_ALPHA, \
 	RE_PREDICT_TIME, FAST_ROTATE_SPEED, RE_PER_DEGREE, ROTATION_K
 
-COAST = 'coast'
 
 class MotionController:
 	def __init__(self, robot, gamestate=None):
@@ -106,19 +105,19 @@ class MotionController:
 		return arr[0] - arr[1]
 
 	def barrier_open(self):
-		self.arduino.direct_command('servo', 100, 0)
+		self.arduino.direct_command('servo', 130, 0)
 		self.is_barrier_open = True
 
 	def barrier_close(self):
-		self.arduino.direct_command('servo', 30, 0)
+		self.arduino.direct_command('servo', 56, 0)
 		self.is_barrier_open = False
 
 	def barrier_plough(self):
-		self.arduino.direct_command('servo', 40, 0)
+		self.arduino.direct_command('servo', 75, 0)
 		self.is_barrier_open = False
 
 	def barrier_reverse_plough(self):
-		self.arduino.direct_command('servo', 0, 0)
+		self.arduino.direct_command('servo', 17, 0)
 		self.is_barrier_open = False
 
 	def move(self, distance, speed=FAST_MOVE_SPEED, interrupts=[], verbose=1, coast=False, ultrasound_interrupt_distance=None):
@@ -435,10 +434,10 @@ class MotionController:
 		if bad_end:
 			print('[MotionController.move_to][ERROR] Illegal position {} requested in move_to(), ignoring.'.format(target_pos))
 			pass
-
+		
 		# Whether we start inside a pillar
 		bad_start = any(pillar.is_point_inside(current_pos) for pillar in self.gamestate.pillars)
-
+		
 		movement_line = (current_pos, target_pos)
 		bad_zones = [zone for zone in self.gamestate.zones_to_avoid if zone.is_crossed_by(movement_line)]
 
@@ -446,7 +445,7 @@ class MotionController:
 		if not bad_zones or bad_start:
 			if bad_start:
 				print('[MotionController.move_to][WARN] Starting inside a pillar, continuing as normal.')
-
+			
 			# How we need to move
 			motion = target_pos - current_pos
 

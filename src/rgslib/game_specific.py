@@ -1,16 +1,9 @@
 # This file is vendored in from the robot-api library to make this library work when robot-api is not installed.
 # This file should track https://raw.githubusercontent.com/sourcebots/robot-api/master/robot/game_specific.py
 
-# ******************************************************************************
-#   NOTICE: IF YOU CHANGE THIS FILE PLEASE CHANGE ITS COUNTERPART IN SB_VISION
-# ******************************************************************************
-# Try to put all game specific code in here
-
 WALL = set(range(0, 28))  # 0 - 27
 
 # Currently for SB2018
-GAME_DURATION_SECONDS = 150
-
 COLUMN_N = set(range(28, 32))
 COLUMN_E = set(range(32, 36))
 COLUMN_S = set(range(36, 40))
@@ -58,4 +51,3 @@ MARKER_SIZES.update({m: (0.1, 0.1) for m in TOKEN})
 
 # Size the vision system will assume a marker is if it's not in MARKER_SIZES
 MARKER_SIZE_DEFAULT = (0.25, 0.25)
-
